@@ -41,7 +41,7 @@ installation and keep its own settings in a game directory of their own:
 WarpQuake2 +set basedir Work:Games/Quake2 +set game warpq2
 ```
 
-`timedemo demo1` at 320x240x8, 68060 at 108 MHz, v0 (id's C renderer, no sound): 7.9 fps.
+`timedemo demo1` at 320x240x8, 68060 at 104 MHz, v0 (id's C renderer, no sound): 7.9 fps.
 
 ```
 WarpQuake2 +set sw_mode 0 +set timedemo 1 +demomap demo1.dm2
