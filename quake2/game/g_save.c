@@ -54,9 +54,9 @@ field_t fields[] = {
 	{"volume", FOFS(volume), F_FLOAT},
 	{"attenuation", FOFS(attenuation), F_FLOAT},
 	{"map", FOFS(map), F_LSTRING},
-	{"origin", FOFS(s.origin), F_VECTOR},
-	{"angles", FOFS(s.angles), F_VECTOR},
-	{"angle", FOFS(s.angles), F_ANGLEHACK},
+	{"origin", FOFS(s) + (int)offsetof(entity_state_t, origin), F_VECTOR},
+	{"angles", FOFS(s) + (int)offsetof(entity_state_t, angles), F_VECTOR},
+	{"angle", FOFS(s) + (int)offsetof(entity_state_t, angles), F_ANGLEHACK},
 
 	{"goalentity", FOFS(goalentity), F_EDICT, FFL_NOSPAWN},
 	{"movetarget", FOFS(movetarget), F_EDICT, FFL_NOSPAWN},
@@ -80,19 +80,19 @@ field_t fields[] = {
 	{"pain", FOFS(pain), F_FUNCTION, FFL_NOSPAWN},
 	{"die", FOFS(die), F_FUNCTION, FFL_NOSPAWN},
 
-	{"stand", FOFS(monsterinfo.stand), F_FUNCTION, FFL_NOSPAWN},
-	{"idle", FOFS(monsterinfo.idle), F_FUNCTION, FFL_NOSPAWN},
-	{"search", FOFS(monsterinfo.search), F_FUNCTION, FFL_NOSPAWN},
-	{"walk", FOFS(monsterinfo.walk), F_FUNCTION, FFL_NOSPAWN},
-	{"run", FOFS(monsterinfo.run), F_FUNCTION, FFL_NOSPAWN},
-	{"dodge", FOFS(monsterinfo.dodge), F_FUNCTION, FFL_NOSPAWN},
-	{"attack", FOFS(monsterinfo.attack), F_FUNCTION, FFL_NOSPAWN},
-	{"melee", FOFS(monsterinfo.melee), F_FUNCTION, FFL_NOSPAWN},
-	{"sight", FOFS(monsterinfo.sight), F_FUNCTION, FFL_NOSPAWN},
-	{"checkattack", FOFS(monsterinfo.checkattack), F_FUNCTION, FFL_NOSPAWN},
-	{"currentmove", FOFS(monsterinfo.currentmove), F_MMOVE, FFL_NOSPAWN},
+	{"stand", FOFS(monsterinfo) + (int)offsetof(monsterinfo_t, stand), F_FUNCTION, FFL_NOSPAWN},
+	{"idle", FOFS(monsterinfo) + (int)offsetof(monsterinfo_t, idle), F_FUNCTION, FFL_NOSPAWN},
+	{"search", FOFS(monsterinfo) + (int)offsetof(monsterinfo_t, search), F_FUNCTION, FFL_NOSPAWN},
+	{"walk", FOFS(monsterinfo) + (int)offsetof(monsterinfo_t, walk), F_FUNCTION, FFL_NOSPAWN},
+	{"run", FOFS(monsterinfo) + (int)offsetof(monsterinfo_t, run), F_FUNCTION, FFL_NOSPAWN},
+	{"dodge", FOFS(monsterinfo) + (int)offsetof(monsterinfo_t, dodge), F_FUNCTION, FFL_NOSPAWN},
+	{"attack", FOFS(monsterinfo) + (int)offsetof(monsterinfo_t, attack), F_FUNCTION, FFL_NOSPAWN},
+	{"melee", FOFS(monsterinfo) + (int)offsetof(monsterinfo_t, melee), F_FUNCTION, FFL_NOSPAWN},
+	{"sight", FOFS(monsterinfo) + (int)offsetof(monsterinfo_t, sight), F_FUNCTION, FFL_NOSPAWN},
+	{"checkattack", FOFS(monsterinfo) + (int)offsetof(monsterinfo_t, checkattack), F_FUNCTION, FFL_NOSPAWN},
+	{"currentmove", FOFS(monsterinfo) + (int)offsetof(monsterinfo_t, currentmove), F_MMOVE, FFL_NOSPAWN},
 
-	{"endfunc", FOFS(moveinfo.endfunc), F_FUNCTION, FFL_NOSPAWN},
+	{"endfunc", FOFS(moveinfo) + (int)offsetof(moveinfo_t, endfunc), F_FUNCTION, FFL_NOSPAWN},
 
 	// temp spawn vars -- only valid when the spawn function is called
 	{"lip", STOFS(lip), F_INT, FFL_SPAWNTEMP},
@@ -133,8 +133,8 @@ field_t		levelfields[] =
 
 field_t		clientfields[] =
 {
-	{"pers.weapon", CLOFS(pers.weapon), F_ITEM},
-	{"pers.lastweapon", CLOFS(pers.lastweapon), F_ITEM},
+	{"pers.weapon", CLOFS(pers) + (int)offsetof(client_persistant_t, weapon), F_ITEM},
+	{"pers.lastweapon", CLOFS(pers) + (int)offsetof(client_persistant_t, lastweapon), F_ITEM},
 	{"newweapon", CLOFS(newweapon), F_ITEM},
 
 	{NULL, 0, F_INT}

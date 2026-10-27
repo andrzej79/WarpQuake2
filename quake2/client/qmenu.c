@@ -47,13 +47,13 @@ extern viddef_t viddef;
 #define Draw_Char re.DrawChar
 #define Draw_Fill re.DrawFill
 
-void Action_DoEnter( menuaction_s *a )
+static void Action_DoEnter( menuaction_s *a )
 {
 	if ( a->generic.callback )
 		a->generic.callback( a );
 }
 
-void Action_Draw( menuaction_s *a )
+static void Action_Draw( menuaction_s *a )
 {
 	if ( a->generic.flags & QMF_LEFT_JUSTIFY )
 	{
@@ -413,7 +413,7 @@ void Menu_Draw( menuframework_s *menu )
 	}
 }
 
-void Menu_DrawStatusBar( const char *string )
+static void Menu_DrawStatusBar( const char *string )
 {
 	if ( string )
 	{
@@ -552,7 +552,7 @@ int Menu_TallySlots( menuframework_s *menu )
 	return total;
 }
 
-void Menulist_DoEnter( menulist_s *l )
+static void Menulist_DoEnter( menulist_s *l )
 {
 	int start;
 
@@ -564,7 +564,7 @@ void Menulist_DoEnter( menulist_s *l )
 		l->generic.callback( l );
 }
 
-void MenuList_Draw( menulist_s *l )
+static void MenuList_Draw( menulist_s *l )
 {
 	const char **n;
 	int y = 0;
@@ -583,13 +583,13 @@ void MenuList_Draw( menulist_s *l )
 	}
 }
 
-void Separator_Draw( menuseparator_s *s )
+static void Separator_Draw( menuseparator_s *s )
 {
 	if ( s->generic.name )
 		Menu_DrawStringR2LDark( s->generic.x + s->generic.parent->x, s->generic.y + s->generic.parent->y, s->generic.name );
 }
 
-void Slider_DoSlide( menuslider_s *s, int dir )
+static void Slider_DoSlide( menuslider_s *s, int dir )
 {
 	s->curvalue += dir;
 
@@ -604,7 +604,7 @@ void Slider_DoSlide( menuslider_s *s, int dir )
 
 #define SLIDER_RANGE 10
 
-void Slider_Draw( menuslider_s *s )
+static void Slider_Draw( menuslider_s *s )
 {
 	int	i;
 
@@ -625,7 +625,7 @@ void Slider_Draw( menuslider_s *s )
 	Draw_Char( ( int ) ( 8 + RCOLUMN_OFFSET + s->generic.parent->x + s->generic.x + (SLIDER_RANGE-1)*8 * s->range ), s->generic.y + s->generic.parent->y, 131);
 }
 
-void SpinControl_DoEnter( menulist_s *s )
+static void SpinControl_DoEnter( menulist_s *s )
 {
 	s->curvalue++;
 	if ( s->itemnames[s->curvalue] == 0 )
@@ -635,7 +635,7 @@ void SpinControl_DoEnter( menulist_s *s )
 		s->generic.callback( s );
 }
 
-void SpinControl_DoSlide( menulist_s *s, int dir )
+static void SpinControl_DoSlide( menulist_s *s, int dir )
 {
 	s->curvalue += dir;
 
@@ -648,7 +648,7 @@ void SpinControl_DoSlide( menulist_s *s, int dir )
 		s->generic.callback( s );
 }
 
-void SpinControl_Draw( menulist_s *s )
+static void SpinControl_Draw( menulist_s *s )
 {
 	char buffer[100];
 

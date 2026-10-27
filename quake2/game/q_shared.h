@@ -38,6 +38,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <stddef.h>
+
+#ifdef __VBCC__
+// vbcc's C library has no strdup or putenv (src/amiga_sys.c)
+char *strdup(const char *s);
+int putenv(char *string);
+#endif
 
 #if (defined _M_IX86 || defined __i386__) && !defined C_ONLY && !defined __sun__
 #define id386	1

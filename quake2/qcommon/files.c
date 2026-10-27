@@ -61,6 +61,23 @@ typedef struct pack_s
 char	fs_gamedir[MAX_OSPATH];
 cvar_t	*fs_basedir;
 cvar_t	*fs_cddir;
+
+// The base directory's default: the program's own directory on AmigaOS.
+#ifdef AMIGA
+#define FS_DEFAULT_BASEDIR "PROGDIR:"
+#else
+#define FS_DEFAULT_BASEDIR "."
+#endif
+
+// The separator between a base directory and what follows it: none after an
+// AmigaDOS device or assign ("PROGDIR:baseq2"), where a '/' would mean the
+// parent directory.
+static const char *FS_Sep (const char *dir)
+{
+	int len = strlen (dir);
+
+	return (len > 0 && dir[len - 1] == ':') ? "" : "/";
+}
 cvar_t	*fs_gamedirvar;
 
 typedef struct filelink_s
@@ -569,9 +586,9 @@ void FS_ExecAutoexec (void)
 
 	dir = Cvar_VariableString("gamedir");
 	if (*dir)
-		Com_sprintf(name, sizeof(name), "%s/%s/autoexec.cfg", fs_basedir->string, dir); 
+		Com_sprintf(name, sizeof(name), "%s%s%s/autoexec.cfg", fs_basedir->string, FS_Sep(fs_basedir->string), dir); 
 	else
-		Com_sprintf(name, sizeof(name), "%s/%s/autoexec.cfg", fs_basedir->string, BASEDIRNAME); 
+		Com_sprintf(name, sizeof(name), "%s%s%s/autoexec.cfg", fs_basedir->string, FS_Sep(fs_basedir->string), BASEDIRNAME); 
 	if (Sys_FindFirst(name, 0, SFF_SUBDIR | SFF_HIDDEN | SFF_SYSTEM))
 		Cbuf_AddText ("exec autoexec.cfg\n");
 	Sys_FindClose();
@@ -618,7 +635,7 @@ void FS_SetGamedir (char *dir)
 	if (dedicated && !dedicated->value)
 		Cbuf_AddText ("vid_restart\nsnd_restart\n");
 
-	Com_sprintf (fs_gamedir, sizeof(fs_gamedir), "%s/%s", fs_basedir->string, dir);
+	Com_sprintf (fs_gamedir, sizeof(fs_gamedir), "%s%s%s", fs_basedir->string, FS_Sep(fs_basedir->string), dir);
 
 	if (!strcmp(dir,BASEDIRNAME) || (*dir == 0))
 	{
@@ -629,8 +646,8 @@ void FS_SetGamedir (char *dir)
 	{
 		Cvar_FullSet ("gamedir", dir, CVAR_SERVERINFO|CVAR_NOSET);
 		if (fs_cddir->string[0])
-			FS_AddGameDirectory (va("%s/%s", fs_cddir->string, dir) );
-		FS_AddGameDirectory (va("%s/%s", fs_basedir->string, dir) );
+			FS_AddGameDirectory (va("%s%s%s", fs_cddir->string, FS_Sep(fs_cddir->string), dir) );
+		FS_AddGameDirectory (va("%s%s%s", fs_basedir->string, FS_Sep(fs_basedir->string), dir) );
 	}
 }
 
@@ -848,7 +865,7 @@ void FS_InitFilesystem (void)
 	// basedir <path>
 	// allows the game to run from outside the data tree
 	//
-	fs_basedir = Cvar_Get ("basedir", ".", CVAR_NOSET);
+	fs_basedir = Cvar_Get ("basedir", FS_DEFAULT_BASEDIR, CVAR_NOSET);
 
 	//
 	// cddir <path>
@@ -857,12 +874,12 @@ void FS_InitFilesystem (void)
 	//
 	fs_cddir = Cvar_Get ("cddir", "", CVAR_NOSET);
 	if (fs_cddir->string[0])
-		FS_AddGameDirectory (va("%s/"BASEDIRNAME, fs_cddir->string) );
+		FS_AddGameDirectory (va("%s%s"BASEDIRNAME, fs_cddir->string, FS_Sep(fs_cddir->string)) );
 
 	//
 	// start up with baseq2 by default
 	//
-	FS_AddGameDirectory (va("%s/"BASEDIRNAME, fs_basedir->string) );
+	FS_AddGameDirectory (va("%s%s"BASEDIRNAME, fs_basedir->string, FS_Sep(fs_basedir->string)) );
 
 	// any set gamedirs will be freed up to here
 	fs_base_searchpaths = fs_searchpaths;
