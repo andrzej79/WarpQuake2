@@ -153,6 +153,7 @@ sentinel at the end (actually, this is the active edge table starting at
 edge_head.next).
 ==============
 */
+#if !Q2_ASM	// r_edge060.s
 void R_InsertNewEdges (edge_t *edgestoadd, edge_t *edgelist)
 {
 	edge_t	*next_edge;
@@ -183,6 +184,7 @@ addedge:
 		edgelist->prev = edgestoadd;
 	} while ((edgestoadd = next_edge) != NULL);
 }
+#endif
 
 #endif	// !id386
 	
@@ -194,6 +196,7 @@ addedge:
 R_RemoveEdges
 ==============
 */
+#if !Q2_ASM	// r_edge060.s
 void R_RemoveEdges (edge_t *pedge)
 {
 
@@ -203,6 +206,7 @@ void R_RemoveEdges (edge_t *pedge)
 		pedge->prev->next = pedge->next;
 	} while ((pedge = pedge->nextremove) != NULL);
 }
+#endif
 
 #endif	// !id386
 
@@ -214,6 +218,7 @@ void R_RemoveEdges (edge_t *pedge)
 R_StepActiveU
 ==============
 */
+#if !Q2_ASM	// r_edge060.s
 void R_StepActiveU (edge_t *pedge)
 {
 	edge_t		*pnext_edge, *pwedge;
@@ -273,6 +278,7 @@ pushback:
 			return;
 	}
 }
+#endif
 
 #endif	// !id386
 
@@ -562,6 +568,7 @@ gotposition:
 R_GenerateSpans
 ==============
 */
+#if !Q2_ASM	// r_edge060.s
 void R_GenerateSpans (void)
 {
 	edge_t			*edge;
@@ -590,6 +597,7 @@ void R_GenerateSpans (void)
 
 	R_CleanupSpan ();
 }
+#endif
 
 #endif	// !id386
 
