@@ -171,6 +171,7 @@ void R_DrawSurface (void)
 R_DrawSurfaceBlock8_mip0
 ================
 */
+#if !Q2_ASM	// r_surf060.s
 void R_DrawSurfaceBlock8_mip0 (void)
 {
 	int				v, i, b, lightstep, lighttemp, light;
@@ -214,6 +215,7 @@ void R_DrawSurfaceBlock8_mip0 (void)
 			psource -= r_stepback;
 	}
 }
+#endif
 
 
 /*
@@ -221,6 +223,7 @@ void R_DrawSurfaceBlock8_mip0 (void)
 R_DrawSurfaceBlock8_mip1
 ================
 */
+#if !Q2_ASM	// r_surf060.s
 void R_DrawSurfaceBlock8_mip1 (void)
 {
 	int				v, i, b, lightstep, lighttemp, light;
@@ -264,6 +267,7 @@ void R_DrawSurfaceBlock8_mip1 (void)
 			psource -= r_stepback;
 	}
 }
+#endif
 
 
 /*
@@ -271,6 +275,7 @@ void R_DrawSurfaceBlock8_mip1 (void)
 R_DrawSurfaceBlock8_mip2
 ================
 */
+#if !Q2_ASM	// r_surf060.s
 void R_DrawSurfaceBlock8_mip2 (void)
 {
 	int				v, i, b, lightstep, lighttemp, light;
@@ -314,6 +319,7 @@ void R_DrawSurfaceBlock8_mip2 (void)
 			psource -= r_stepback;
 	}
 }
+#endif
 
 
 /*
@@ -321,6 +327,7 @@ void R_DrawSurfaceBlock8_mip2 (void)
 R_DrawSurfaceBlock8_mip3
 ================
 */
+#if !Q2_ASM	// r_surf060.s
 void R_DrawSurfaceBlock8_mip3 (void)
 {
 	int				v, i, b, lightstep, lighttemp, light;
@@ -364,6 +371,7 @@ void R_DrawSurfaceBlock8_mip3 (void)
 			psource -= r_stepback;
 	}
 }
+#endif
 
 #endif
 
