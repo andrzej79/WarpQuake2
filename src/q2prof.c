@@ -74,7 +74,7 @@ static const q2p_row_t rows[] = {
   {1, "blit to display", Q2P_BLIT, NONE},
   {1, "frame CRC (-crc)", Q2P_CRC, NONE},
   {0, "sound", Q2P_SOUND, NONE},
-  {0, "rest of the frame", Q2P_FRAME, {Q2P_SERVER, Q2P_CLIENT, Q2P_PREDICT, Q2P_SCREEN}},
+  {0, "rest of the frame", Q2P_FRAME, {Q2P_SERVER, Q2P_CLIENT, Q2P_PREDICT, Q2P_SCREEN, -1}},
 };
 
 static void CRCInit(void)

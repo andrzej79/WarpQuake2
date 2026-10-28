@@ -1,6 +1,6 @@
-; r_scan060.s -- the world span drawer for the 68060
+; r_scan060.s -- the world span and z-span drawers for the 68060
 ;
-; D_DrawSpans16, replacing the C version in r_scan.c (built with Q2_ASM=1,
+; D_DrawSpans16 and D_DrawZSpans (below), replacing the C versions in r_scan.c (built with Q2_ASM=1,
 ; the default).  It is WarpQuake's D_DrawSpans8 (its d_spans060.s, the generic
 ; SpanDrawer body), because Quake II's D_DrawSpans16 is Quake's D_DrawSpans8
 ; operation for operation: 8-pixel blocks despite the name.  It must draw
@@ -53,6 +53,10 @@ PIX16	equ	0				; WarpQuake's 16 bpp build of the same body: not used here
 	xref	_q2c_count			; unsigned long[]: q2prof.h work counters
 
 	xdef	_D_DrawSpans16
+	xdef	_D_DrawZSpans
+
+	xref	_d_pzbuffer		; short *: the z-buffer
+	xref	_d_zwidth		; unsigned: its row length, in shorts
 
 ; espan_t (r_local.h)
 SPAN_U		equ	0
@@ -63,6 +67,7 @@ SPAN_NEXT	equ	12
 ; q2c_count[] byte offsets: the order of q2p_counter_t in q2prof.h
 Q2C_SPAN_PIXELS	equ	0*4
 Q2C_SPANS	equ	1*4
+Q2C_ZSPAN_PIXELS	equ	3*4
 
 ; Saved on entry.
 SAVED_INT	equ	11*4			; d2-d7/a2-a6
@@ -424,6 +429,97 @@ SpanDrawer	macro
 	cnop	0,4
 _D_DrawSpans16
 	SpanDrawer	8,3,$41000000
+
+;------------------------------------------------------------------------------
+; void D_DrawZSpans (espan_t *pspan)
+;
+; The z of each span pixel: izi = (int)(1/z * 0x8000 * 0x10000) at the span's
+; start, stepped by izistep a pixel, and (short)(izi >> 16) stored.  The float
+; part is vbcc's code for the C, operation for operation: 1/z stays extended
+; (the C's float zi lives in a register and is never rounded to single), times
+; 32768 then 65536, truncated (FINTRZ).
+;
+; The C stored one word a pixel, shifting each.  Here pairs: two
+; accumulators, for the even and the odd pixels, each stepped by 2 * izistep
+; (the same values mod 2^32), and the odd one's high word SWAPped into the
+; even one's low word, so a pair is one longword store (the C's pair, packed
+; big-endian).  Like the C, a span on an odd word address starts with one
+; word, and an odd count ends with one.
+;
+;   a0 = pdest   a1 = the span   d1 = izi (even pixels)   d6 = izi (odd)
+;   d4 = izistep   d5 = 2 * izistep   d2 = count   d3 = pairs left
+;------------------------------------------------------------------------------
+
+	cnop	0,4
+_D_DrawZSpans
+	movem.l	d2-d7,-(sp)
+	move.l	4+6*4(sp),a1
+	fmove.s	_d_zistepu,fp0
+	fmul.s	#$47000000,fp0			; * 32768.0
+	fmul.s	#$47800000,fp0			; * 65536.0
+	fintrz.x	fp0,fp0
+	fmove.l	fp0,d4				; izistep
+	move.l	d4,d5
+	add.l	d5,d5				; 2 * izistep
+
+.span
+	move.l	SPAN_V(a1),d0
+	move.l	_d_zwidth,d1
+	mulu.l	d0,d1
+	add.l	SPAN_U(a1),d1
+	move.l	_d_pzbuffer,a0
+	lea	(a0,d1.l*2),a0			; pdest
+	move.l	SPAN_COUNT(a1),d2
+	add.l	d2,_q2c_count+Q2C_ZSPAN_PIXELS
+	; zi = d_ziorigin + dv*d_zistepv + du*d_zistepu, as vbcc evaluates it
+	fmove.l	SPAN_U(a1),fp1
+	fmove.l	d0,fp0
+	fmul.s	_d_zistepv,fp0
+	fadd.s	_d_ziorigin,fp0
+	fmul.s	_d_zistepu,fp1
+	fadd.x	fp1,fp0
+	fmul.s	#$47000000,fp0
+	fmul.s	#$47800000,fp0
+	fintrz.x	fp0,fp0
+	fmove.l	fp0,d1				; izi
+
+	move.l	a0,d0
+	btst	#1,d0
+	beq.s	.aligned
+	move.l	d1,d0
+	swap	d0
+	move.w	d0,(a0)+
+	add.l	d4,d1
+	subq.l	#1,d2
+.aligned
+	move.l	d2,d3
+	asr.l	#1,d3				; pairs
+	ble.s	.tail
+	move.l	d1,d6
+	add.l	d4,d6				; the odd pixels' izi
+.pair
+	move.l	d1,d0				; this pixel's z in the high word ...
+	move.l	d6,d7
+	swap	d7
+	move.w	d7,d0				; ... the next one's in the low word
+	add.l	d5,d1
+	add.l	d5,d6
+	move.l	d0,(a0)+
+	subq.l	#1,d3
+	bgt.s	.pair
+.tail
+	btst	#0,d2
+	beq.s	.next
+	move.l	d1,d0
+	swap	d0
+	move.w	d0,(a0)
+.next
+	move.l	SPAN_NEXT(a1),d0
+	move.l	d0,a1
+	bne	.span
+
+	movem.l	(sp)+,d2-d7
+	rts
 
 ;------------------------------------------------------------------------------
 ; recip_up: 1/d for d = 1..15 as 80-bit extendeds, rounded UP (generated with

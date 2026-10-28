@@ -540,6 +540,7 @@ void D_DrawSpans16 (espan_t *pspan)
 D_DrawZSpans
 =============
 */
+#if !Q2_ASM	// r_scan060.s
 void D_DrawZSpans (espan_t *pspan)
 {
 	int				count, doublecount, izistep;
@@ -594,6 +595,7 @@ void D_DrawZSpans (espan_t *pspan)
 
 	} while ((pspan = pspan->pnext) != NULL);
 }
+#endif
 
 #endif
 
