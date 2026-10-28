@@ -2190,6 +2190,9 @@ void CL_TeleportParticles (vec3_t org)
 CL_AddParticles
 ===============
 */
+extern int		r_numparticles;		// cl_view.c
+extern particle_t	r_particles[MAX_PARTICLES];
+
 void CL_AddParticles (void)
 {
 	cparticle_t		*p, *next;
@@ -2241,11 +2244,18 @@ void CL_AddParticles (void)
 
 		time2 = time*time;
 
-		org[0] = p->org[0] + p->vel[0]*time + p->accel[0]*time2;
-		org[1] = p->org[1] + p->vel[1]*time + p->accel[1]*time2;
-		org[2] = p->org[2] + p->vel[2]*time + p->accel[2]*time2;
+		// WarpQuake: V_AddParticle inline, its float origin written directly
+		// (the same single-precision rounding org[] gave it)
+		if (r_numparticles < MAX_PARTICLES)
+		{
+			particle_t	*rp = &r_particles[r_numparticles++];
 
-		V_AddParticle (org, color, alpha);
+			rp->origin[0] = p->org[0] + p->vel[0]*time + p->accel[0]*time2;
+			rp->origin[1] = p->org[1] + p->vel[1]*time + p->accel[1]*time2;
+			rp->origin[2] = p->org[2] + p->vel[2]*time + p->accel[2]*time2;
+			rp->color = color;
+			rp->alpha = alpha;
+		}
 		// PMM
 		if (p->alphavel == INSTANT_PARTICLE)
 		{
