@@ -15,6 +15,9 @@ alias model rasterizer, the edge-list scan, edge clipping, the face and BSP walk
 new: the alias vertex transform, the alias triangle loop and the particle drawer. Every asm
 routine draws exactly what the C beside it draws, frame for frame (see *Checking*).
 
+It runs on an 8-bit CLUT or a 16-bit RGB screen (`vid_bpp 16`). At 16 bpp the lighting is
+computed per colour instead of rounded to the 256-colour palette.
+
 WarpQuake2 is GPL v2, as id's code is (`LICENSE`). Quake II's game data is not included: copy
 your own `baseq2/pak*.pak` next to the program.
 
@@ -25,7 +28,8 @@ your own `baseq2/pak*.pak` next to the program.
 | build | ms/frame | fps |
 |---|---:|---:|
 | v0: id's C, built with vbcc | 127.99 | 7.81 |
-| now | 87.76 | 11.39 |
+| now, 8 bpp | 86.33 | 11.58 |
+| now, 16 bpp (`vid_bpp 16`) | 94.94 | 10.53 |
 
 The steps, each measured on its own:
 
@@ -49,6 +53,7 @@ The steps, each measured on its own:
 | HUD picture lookups cached, dead `skintable` rebuild dropped | 88.46 |
 | particles in asm | 88.09 |
 | light styles and particles added inline | 87.76 |
+| frame copied to the screen with MOVE16 (`vid_blit -1` on a Warp) | 86.33 |
 
 `sw_subdiv16 1` (the default) computes s and t exactly every 16 pixels, as id's x86 code did;
 id's C did it every 8 (its own FIXME says so). `sw_subdiv16 0` is the C's 8 again.
@@ -86,6 +91,24 @@ installation and keep its own settings in a game directory of their own:
 WarpQuake2 +set basedir Work:Games/Quake2 +set game warpq2
 ```
 
+**16 bpp.** `vid_bpp 16` (saved; `+set vid_bpp 16` on the command line) opens a 16-bit RTG
+mode instead of a CLUT one, falling back to 8 bits if there is none. The renderer then draws
+RGB565 pixels: the lighting goes through a 16-bit colormap built with the formula id's
+`colormap.pcx` was made with (brightness 2 - 2l/63), without rounding each lit colour to the
+nearest of the 256, so it is smooth and keeps its hue. The surface cache, the sky, the
+warping water and the sprites hold pixels; skins and pictures stay palette indexes, looked up
+as they are drawn. The translucent surfaces, shells and particles are mixed per channel
+(33/66%, as the 8-bit alphamap). The palette blend (damage and bonus flashes, under water,
+powerups), which an 8-bit screen gets from its CLUT, is blended into the frame as it is
+copied to the screen. The frame is big-endian RGB565, the Warp's 16-bit format; another
+16-bit format gets it through `p96WritePixelArray`, which converts. `screenshot` is 8-bit only.
+
+**`vid_blit`** (saved) picks how the frame reaches the screen: `0` WriteChunkyPixels (8 bpp) or
+p96WritePixelArray (16), `1` the bitmap locked and the rows copied with CopyMemQuick, `2` the
+same with MOVE16 bursts. `-1`, the default, is `2` on a Warp board (its RTG memory is uncached
+and built for bursts: 1.46 ms a 320x240x8 frame against WriteChunkyPixels' 2.41) and `0` on any
+other, since MOVE16 into Zorro III memory fails on some machines.
+
 A timedemo:
 
 ```
@@ -110,18 +133,29 @@ timedemo draws the same frames at any speed. The report goes to the console and
 `RAM:WarpQuake2_prof.txt`.
 
 `tools/bench.py` runs a timedemo on the Amiga through a remote-shell command (named by
-`AMIGA_RUNNER` in `tools/ftp_config.local`; see the script), and returns as soon as it ends: `--runs N`, `--prof`, `--sample` (fetched and summarised with `tools/wprof.py`; build with
+`AMIGA_RUNNER` in `tools/ftp_config.local`; see the script), and returns as soon as it ends:
+`--runs N`, `--bpp 16`, `--prof`, `--sample` (fetched and summarised with `tools/wprof.py`; build with
 `make prof` first), `--crc`. Before each run it puts `tools/bench_config.cfg` into the game
 directory, so every run starts from the defaults. `tools/pchist.py` turns a sample profile into
 a per-instruction histogram of one asm function.
 
 ## Checking
 
-`tools/vamos_crc.sh [binary]` runs the timedemo headless under vamos (amitools) on the host, in
-about 40 s: no task switches, no interrupts, and 80-bit floats computed exactly as the 060 does,
-so its CRCs are exactly reproducible. `ASM=0` and `ASM=1` must print the same CRC. Now:
-`0380799c` (demo1, 320x240, `sw_subdiv16 1`); `sw_subdiv16 0` gives a different one, again the
-same for both builds.
+`tools/vamos_crc.sh [binary] [options]` runs the timedemo headless under vamos (amitools) on the
+host, in about 40 s: no task switches, no interrupts, and 80-bit floats computed exactly as the
+060 does, so its CRCs are exactly reproducible (`DEMO=demo2` for the other demo). `ASM=0` and
+`ASM=1` must print the same CRC. Now: `0380799c` (demo1, 320x240, `sw_subdiv16 1`) and
+`2d5bb708` (demo2); `sw_subdiv16 0` gives a different one, again the same for both builds.
+
+**16 bpp** (`+set vid_bpp 16`) is checked with `-rgbtest`: the colour tables then hold the
+8-bit renderer's palette indexes and the blends go through its alphamap, so the low byte of
+each 16-bit pixel is the 8-bit frame, and `-crc`, which then hashes only those bytes, must
+print the 8-bit references above. That checks every 16-bit drawer against the 8-bit renderer;
+the `ASM=1` build does. In real colour demo1 gives `b13305d2`. The `ASM=0` build differs by a
+pixel in some frames at 16 bpp, because vbcc rounds the floats of the C copies of the span
+drawers differently (register allocation); the asm is the 8-bit code assembled again with
+`PIX16`. At 16 bpp `-crcdump` also writes the pixels (`frame<n>_<w>x<h>.rgb565`), which
+`tools/rgb565png.py` turns into a PNG.
 
 On the bench 1260X the same build differs from run to run in some 10-20 frames of 689, by a
 pixel or a float's last bit, even with interrupts off and with L2 early ack off; vamos does not.
@@ -132,7 +166,8 @@ Engine bugs fixed on the way: an instant particle's time was read uninitialised
 
 ## Source layout
 
-- `quake2/` - id's engine. The changes: what vbcc needs (field offsets with `offsetof`, linkage
+- `quake2/` - id's engine. `ref_soft/r_rgb.c` holds the 16 bpp tables; `*060rgb.s` assemble
+  the drawers again with `PIX16`. The changes: what vbcc needs (field offsets with `offsetof`, linkage
   that matches its declarations, `strdup`/`putenv` declared), the base directory joined
   without a `/` after a `:` (`PROGDIR:baseq2`), the game's `maxclients` and `dedicated`
   renamed apart from the engine's, the instrumentation hooks, and the renderer work above.

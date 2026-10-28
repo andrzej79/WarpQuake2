@@ -60,6 +60,8 @@ void R_DrawSprite (void)
 	s_psprframe = &s_psprite->frames[currententity->frame];
 
 	r_polydesc.pixels       = currentmodel->skins[currententity->frame]->pixels[0];
+	if (r_pixbytes == 2)	// WarpQuake2: 16 bpp
+		r_polydesc.pixels = (byte *)R_Pixels16 (currentmodel->skins[currententity->frame]);
 	r_polydesc.pixel_width  = s_psprframe->width;
 	r_polydesc.pixel_height = s_psprframe->height;
 	r_polydesc.dist         = 0;

@@ -503,6 +503,462 @@ void R_DrawSpanlet66Stipple( void )
 }
 
 /*
+** WarpQuake2: the spanlets above at 16 bpp, made from them by replacing
+** the pixel accesses: the source is pixels (the surface cache, or a
+** sprite's or a warping texture's R_Pixels16, where r_rgbkey is the
+** transparent texel), s_spanletvars.pdest stays the 8-bit frame address
+** (RGB_DEST) and is stepped as the 8-bit spanlets step it.
+*/
+/*
+** R_DrawSpanletOpaqueRGB
+*/
+void R_DrawSpanletOpaqueRGB( void )
+{
+	unsigned btemp;
+
+	do
+	{
+		unsigned ts, tt;
+
+		ts = s_spanletvars.s >> 16;
+		tt = s_spanletvars.t >> 16;
+
+		btemp = *((unsigned short *)s_spanletvars.pbase + (ts) + (tt) * cachewidth);
+		if (btemp != r_rgbkey)
+		{
+			if (*s_spanletvars.pz <= (s_spanletvars.izi >> 16))
+			{
+				*s_spanletvars.pz    = s_spanletvars.izi >> 16;
+				*RGB_DEST (s_spanletvars.pdest) = btemp;
+			}
+		}
+
+		s_spanletvars.izi += s_spanletvars.izistep;
+		s_spanletvars.pdest++;
+		s_spanletvars.pz++;
+		s_spanletvars.s += s_spanletvars.sstep;
+		s_spanletvars.t += s_spanletvars.tstep;
+	} while (--s_spanletvars.spancount > 0);
+}
+
+/*
+** R_DrawSpanletTurbulentStipple33RGB
+*/
+void R_DrawSpanletTurbulentStipple33RGB( void )
+{
+	unsigned btemp;
+	int	     sturb, tturb;
+	unsigned short *pdest = RGB_DEST (s_spanletvars.pdest);
+	short   *pz    = s_spanletvars.pz;
+	int      izi   = s_spanletvars.izi;
+	
+	if ( s_spanletvars.v & 1 )
+	{
+		s_spanletvars.pdest += s_spanletvars.spancount;
+		s_spanletvars.pz    += s_spanletvars.spancount;
+
+		if ( s_spanletvars.spancount == AFFINE_SPANLET_SIZE )
+			s_spanletvars.izi += s_spanletvars.izistep << AFFINE_SPANLET_SIZE_BITS;
+		else
+			s_spanletvars.izi += s_spanletvars.izistep * s_spanletvars.izistep;
+		
+		if ( s_spanletvars.u & 1 )
+		{
+			izi += s_spanletvars.izistep;
+			s_spanletvars.s   += s_spanletvars.sstep;
+			s_spanletvars.t   += s_spanletvars.tstep;
+
+			pdest++;
+			pz++;
+			s_spanletvars.spancount--;
+		}
+
+		s_spanletvars.sstep   *= 2;
+		s_spanletvars.tstep   *= 2;
+
+		while ( s_spanletvars.spancount > 0 )
+		{
+			sturb = ((s_spanletvars.s + r_turb_turb[(s_spanletvars.t>>16)&(CYCLE-1)])>>16)&63;
+			tturb = ((s_spanletvars.t + r_turb_turb[(s_spanletvars.s>>16)&(CYCLE-1)])>>16)&63;
+			
+			btemp = *( (unsigned short *)s_spanletvars.pbase + ( sturb ) + ( tturb << 6 ) );
+			
+			if ( *pz <= ( izi >> 16 ) )
+				*pdest = btemp;
+			
+			izi               += s_spanletvars.izistep_times_2;
+			s_spanletvars.s   += s_spanletvars.sstep;
+			s_spanletvars.t   += s_spanletvars.tstep;
+			
+			pdest += 2;
+			pz    += 2;
+			
+			s_spanletvars.spancount -= 2;
+		}
+	}
+}
+
+/*
+** R_DrawSpanletTurbulentStipple66RGB
+*/
+void R_DrawSpanletTurbulentStipple66RGB( void )
+{
+	unsigned btemp;
+	int	     sturb, tturb;
+	unsigned short *pdest = RGB_DEST (s_spanletvars.pdest);
+	short   *pz    = s_spanletvars.pz;
+	int      izi   = s_spanletvars.izi;
+	
+	if ( !( s_spanletvars.v & 1 ) )
+	{
+		s_spanletvars.pdest += s_spanletvars.spancount;
+		s_spanletvars.pz    += s_spanletvars.spancount;
+
+		if ( s_spanletvars.spancount == AFFINE_SPANLET_SIZE )
+			s_spanletvars.izi += s_spanletvars.izistep << AFFINE_SPANLET_SIZE_BITS;
+		else
+			s_spanletvars.izi += s_spanletvars.izistep * s_spanletvars.izistep;
+		
+		if ( s_spanletvars.u & 1 )
+		{
+			izi += s_spanletvars.izistep;
+			s_spanletvars.s   += s_spanletvars.sstep;
+			s_spanletvars.t   += s_spanletvars.tstep;
+
+			pdest++;
+			pz++;
+			s_spanletvars.spancount--;
+		}
+
+		s_spanletvars.sstep   *= 2;
+		s_spanletvars.tstep   *= 2;
+
+		while ( s_spanletvars.spancount > 0 )
+		{
+			sturb = ((s_spanletvars.s + r_turb_turb[(s_spanletvars.t>>16)&(CYCLE-1)])>>16)&63;
+			tturb = ((s_spanletvars.t + r_turb_turb[(s_spanletvars.s>>16)&(CYCLE-1)])>>16)&63;
+			
+			btemp = *( (unsigned short *)s_spanletvars.pbase + ( sturb ) + ( tturb << 6 ) );
+			
+			if ( *pz <= ( izi >> 16 ) )
+				*pdest = btemp;
+			
+			izi               += s_spanletvars.izistep_times_2;
+			s_spanletvars.s   += s_spanletvars.sstep;
+			s_spanletvars.t   += s_spanletvars.tstep;
+			
+			pdest += 2;
+			pz    += 2;
+			
+			s_spanletvars.spancount -= 2;
+		}
+	}
+	else
+	{
+		s_spanletvars.pdest += s_spanletvars.spancount;
+		s_spanletvars.pz    += s_spanletvars.spancount;
+
+		if ( s_spanletvars.spancount == AFFINE_SPANLET_SIZE )
+			s_spanletvars.izi += s_spanletvars.izistep << AFFINE_SPANLET_SIZE_BITS;
+		else
+			s_spanletvars.izi += s_spanletvars.izistep * s_spanletvars.izistep;
+		
+		while ( s_spanletvars.spancount > 0 )
+		{
+			sturb = ((s_spanletvars.s + r_turb_turb[(s_spanletvars.t>>16)&(CYCLE-1)])>>16)&63;
+			tturb = ((s_spanletvars.t + r_turb_turb[(s_spanletvars.s>>16)&(CYCLE-1)])>>16)&63;
+			
+			btemp = *( (unsigned short *)s_spanletvars.pbase + ( sturb ) + ( tturb << 6 ) );
+			
+			if ( *pz <= ( izi >> 16 ) )
+				*pdest = btemp;
+			
+			izi               += s_spanletvars.izistep;
+			s_spanletvars.s   += s_spanletvars.sstep;
+			s_spanletvars.t   += s_spanletvars.tstep;
+			
+			pdest++;
+			pz++;
+			
+			s_spanletvars.spancount--;
+		}
+	}
+}
+
+/*
+** R_DrawSpanletTurbulentBlended
+*/
+void R_DrawSpanletTurbulentBlended66RGB( void )
+{
+	unsigned btemp;
+	int	     sturb, tturb;
+
+	do
+	{
+		sturb = ((s_spanletvars.s + r_turb_turb[(s_spanletvars.t>>16)&(CYCLE-1)])>>16)&63;
+		tturb = ((s_spanletvars.t + r_turb_turb[(s_spanletvars.s>>16)&(CYCLE-1)])>>16)&63;
+
+		btemp = *( (unsigned short *)s_spanletvars.pbase + ( sturb ) + ( tturb << 6 ) );
+
+		if ( *s_spanletvars.pz <= ( s_spanletvars.izi >> 16 ) )
+			*RGB_DEST (s_spanletvars.pdest) = RGB_BLEND66 (btemp, *RGB_DEST (s_spanletvars.pdest));
+
+		s_spanletvars.izi += s_spanletvars.izistep;
+		s_spanletvars.pdest++;
+		s_spanletvars.pz++;
+		s_spanletvars.s += s_spanletvars.sstep;
+		s_spanletvars.t += s_spanletvars.tstep;
+
+	} while ( --s_spanletvars.spancount > 0 );
+}
+
+void R_DrawSpanletTurbulentBlended33RGB( void )
+{
+	unsigned btemp;
+	int	     sturb, tturb;
+
+	do
+	{
+		sturb = ((s_spanletvars.s + r_turb_turb[(s_spanletvars.t>>16)&(CYCLE-1)])>>16)&63;
+		tturb = ((s_spanletvars.t + r_turb_turb[(s_spanletvars.s>>16)&(CYCLE-1)])>>16)&63;
+
+		btemp = *( (unsigned short *)s_spanletvars.pbase + ( sturb ) + ( tturb << 6 ) );
+
+		if ( *s_spanletvars.pz <= ( s_spanletvars.izi >> 16 ) )
+			*RGB_DEST (s_spanletvars.pdest) = RGB_BLEND33 (btemp, *RGB_DEST (s_spanletvars.pdest));
+
+		s_spanletvars.izi += s_spanletvars.izistep;
+		s_spanletvars.pdest++;
+		s_spanletvars.pz++;
+		s_spanletvars.s += s_spanletvars.sstep;
+		s_spanletvars.t += s_spanletvars.tstep;
+
+	} while ( --s_spanletvars.spancount > 0 );
+}
+
+/*
+** R_DrawSpanlet33RGB
+*/
+void R_DrawSpanlet33RGB( void )
+{
+	unsigned btemp;
+
+	do
+	{
+		unsigned ts, tt;
+
+		ts = s_spanletvars.s >> 16;
+		tt = s_spanletvars.t >> 16;
+
+		btemp = *((unsigned short *)s_spanletvars.pbase + (ts) + (tt) * cachewidth);
+
+		if ( btemp != r_rgbkey )
+		{
+			if (*s_spanletvars.pz <= (s_spanletvars.izi >> 16))
+			{
+				*RGB_DEST (s_spanletvars.pdest) = RGB_BLEND33 (btemp, *RGB_DEST (s_spanletvars.pdest));
+			}
+		}
+
+		s_spanletvars.izi += s_spanletvars.izistep;
+		s_spanletvars.pdest++;
+		s_spanletvars.pz++;
+		s_spanletvars.s += s_spanletvars.sstep;
+		s_spanletvars.t += s_spanletvars.tstep;
+	} while (--s_spanletvars.spancount > 0);
+}
+
+void R_DrawSpanletConstant33RGB( void )
+{
+	do
+	{
+		if (*s_spanletvars.pz <= (s_spanletvars.izi >> 16))
+		{
+			*RGB_DEST (s_spanletvars.pdest) = RGB_BLEND33 (d_8to16table[r_polyblendcolor & 0xFF], *RGB_DEST (s_spanletvars.pdest));
+		}
+
+		s_spanletvars.izi += s_spanletvars.izistep;
+		s_spanletvars.pdest++;
+		s_spanletvars.pz++;
+	} while (--s_spanletvars.spancount > 0);
+}
+
+/*
+** R_DrawSpanlet66RGB
+*/
+void R_DrawSpanlet66RGB( void )
+{
+	unsigned btemp;
+
+	do
+	{
+		unsigned ts, tt;
+
+		ts = s_spanletvars.s >> 16;
+		tt = s_spanletvars.t >> 16;
+
+		btemp = *((unsigned short *)s_spanletvars.pbase + (ts) + (tt) * cachewidth);
+
+		if ( btemp != r_rgbkey )
+		{
+			if (*s_spanletvars.pz <= (s_spanletvars.izi >> 16))
+			{
+				*RGB_DEST (s_spanletvars.pdest) = RGB_BLEND66 (btemp, *RGB_DEST (s_spanletvars.pdest));
+			}
+		}
+
+		s_spanletvars.izi += s_spanletvars.izistep;
+		s_spanletvars.pdest++;
+		s_spanletvars.pz++;
+		s_spanletvars.s += s_spanletvars.sstep;
+		s_spanletvars.t += s_spanletvars.tstep;
+	} while (--s_spanletvars.spancount > 0);
+}
+
+/*
+** R_DrawSpanlet33StippleRGB
+*/
+void R_DrawSpanlet33StippleRGB( void )
+{
+	unsigned btemp;
+	unsigned short *pdest = RGB_DEST (s_spanletvars.pdest);
+	short   *pz    = s_spanletvars.pz;
+	int      izi   = s_spanletvars.izi;
+	
+	if ( r_polydesc.stipple_parity ^ ( s_spanletvars.v & 1 ) )
+	{
+		s_spanletvars.pdest += s_spanletvars.spancount;
+		s_spanletvars.pz    += s_spanletvars.spancount;
+
+		if ( s_spanletvars.spancount == AFFINE_SPANLET_SIZE )
+			s_spanletvars.izi += s_spanletvars.izistep << AFFINE_SPANLET_SIZE_BITS;
+		else
+			s_spanletvars.izi += s_spanletvars.izistep * s_spanletvars.izistep;
+		
+		if ( r_polydesc.stipple_parity ^ ( s_spanletvars.u & 1 ) )
+		{
+			izi += s_spanletvars.izistep;
+			s_spanletvars.s   += s_spanletvars.sstep;
+			s_spanletvars.t   += s_spanletvars.tstep;
+
+			pdest++;
+			pz++;
+			s_spanletvars.spancount--;
+		}
+
+		s_spanletvars.sstep *= 2;
+		s_spanletvars.tstep *= 2;
+
+		while ( s_spanletvars.spancount > 0 )
+		{
+			unsigned s = s_spanletvars.s >> 16;
+			unsigned t = s_spanletvars.t >> 16;
+
+			btemp = *( (unsigned short *)s_spanletvars.pbase + ( s ) + ( t * cachewidth ) );
+			
+			if ( btemp != r_rgbkey )
+			{
+				if ( *pz <= ( izi >> 16 ) )
+					*pdest = btemp;
+			}
+			
+			izi               += s_spanletvars.izistep_times_2;
+			s_spanletvars.s   += s_spanletvars.sstep;
+			s_spanletvars.t   += s_spanletvars.tstep;
+			
+			pdest += 2;
+			pz    += 2;
+			
+			s_spanletvars.spancount -= 2;
+		}
+	}
+}
+
+/*
+** R_DrawSpanlet66StippleRGB
+*/
+void R_DrawSpanlet66StippleRGB( void )
+{
+	unsigned btemp;
+	unsigned short *pdest = RGB_DEST (s_spanletvars.pdest);
+	short   *pz    = s_spanletvars.pz;
+	int      izi   = s_spanletvars.izi;
+
+	s_spanletvars.pdest += s_spanletvars.spancount;
+	s_spanletvars.pz    += s_spanletvars.spancount;
+
+	if ( s_spanletvars.spancount == AFFINE_SPANLET_SIZE )
+		s_spanletvars.izi += s_spanletvars.izistep << AFFINE_SPANLET_SIZE_BITS;
+	else
+		s_spanletvars.izi += s_spanletvars.izistep * s_spanletvars.izistep;
+
+	if ( r_polydesc.stipple_parity ^ ( s_spanletvars.v & 1 ) )
+	{
+		if ( r_polydesc.stipple_parity ^ ( s_spanletvars.u & 1 ) )
+		{
+			izi += s_spanletvars.izistep;
+			s_spanletvars.s += s_spanletvars.sstep;
+			s_spanletvars.t += s_spanletvars.tstep;
+
+			pdest++;
+			pz++;
+			s_spanletvars.spancount--;
+		}
+
+		s_spanletvars.sstep *= 2;
+		s_spanletvars.tstep *= 2;
+
+		while ( s_spanletvars.spancount > 0 )
+		{
+			unsigned s = s_spanletvars.s >> 16;
+			unsigned t = s_spanletvars.t >> 16;
+			
+			btemp = *( (unsigned short *)s_spanletvars.pbase + ( s ) + ( t * cachewidth ) );
+
+			if ( btemp != r_rgbkey )
+			{
+				if ( *pz <= ( izi >> 16 ) )
+					*pdest = btemp;
+			}
+			
+			izi             += s_spanletvars.izistep_times_2;
+			s_spanletvars.s += s_spanletvars.sstep;
+			s_spanletvars.t += s_spanletvars.tstep;
+			
+			pdest += 2;
+			pz    += 2;
+			
+			s_spanletvars.spancount -= 2;
+		}
+	}
+	else
+	{
+		while ( s_spanletvars.spancount > 0 )
+		{
+			unsigned s = s_spanletvars.s >> 16;
+			unsigned t = s_spanletvars.t >> 16;
+			
+			btemp = *( (unsigned short *)s_spanletvars.pbase + ( s ) + ( t * cachewidth ) );
+			
+			if ( btemp != r_rgbkey )
+			{
+				if ( *pz <= ( izi >> 16 ) )
+					*pdest = btemp;
+			}
+			
+			izi             += s_spanletvars.izistep;
+			s_spanletvars.s += s_spanletvars.sstep;
+			s_spanletvars.t += s_spanletvars.tstep;
+			
+			pdest++;
+			pz++;
+			
+			s_spanletvars.spancount--;
+		}
+	}
+}
+
+/*
 ** R_ClipPolyFace
 **
 ** Clips the winding at clip_verts[clip_current] and changes clip_current
@@ -952,6 +1408,30 @@ void R_ClipAndDrawPoly( float alpha, qboolean isturbulent, qboolean textured )
 		}
 	}
 
+	if (r_pixbytes == 2)
+	{	// WarpQuake2: the 16 bpp twin
+		static void (*const spanlets[][2])(void) = {
+			{ R_DrawSpanletOpaque, R_DrawSpanletOpaqueRGB },
+			{ R_DrawSpanletTurbulentStipple33, R_DrawSpanletTurbulentStipple33RGB },
+			{ R_DrawSpanletTurbulentStipple66, R_DrawSpanletTurbulentStipple66RGB },
+			{ R_DrawSpanletTurbulentBlended66, R_DrawSpanletTurbulentBlended66RGB },
+			{ R_DrawSpanletTurbulentBlended33, R_DrawSpanletTurbulentBlended33RGB },
+			{ R_DrawSpanlet33, R_DrawSpanlet33RGB },
+			{ R_DrawSpanletConstant33, R_DrawSpanletConstant33RGB },
+			{ R_DrawSpanlet66, R_DrawSpanlet66RGB },
+			{ R_DrawSpanlet33Stipple, R_DrawSpanlet33StippleRGB },
+			{ R_DrawSpanlet66Stipple, R_DrawSpanlet66StippleRGB },
+		};
+		int		k;
+
+		for (k = 0 ; k < sizeof(spanlets) / sizeof(spanlets[0]) ; k++)
+			if (r_polydesc.drawspanlet == spanlets[k][0])
+			{
+				r_polydesc.drawspanlet = spanlets[k][1];
+				break;
+			}
+	}
+
 	// clip to the frustum in worldspace
 	nump = r_polydesc.nump;
 	clip_current = 0;
@@ -1050,6 +1530,8 @@ void R_BuildPolygonFromSurface(msurface_t *fa)
 	if ( fa->texinfo->flags & SURF_WARP )
 	{
 		r_polydesc.pixels       = fa->texinfo->image->pixels[0];
+		if (r_pixbytes == 2)
+			r_polydesc.pixels = (byte *)R_Pixels16 (fa->texinfo->image);
 		r_polydesc.pixel_width  = fa->texinfo->image->width;
 		r_polydesc.pixel_height = fa->texinfo->image->height;
 	}

@@ -32,7 +32,12 @@
 
 	machine	68060
 
-PIX16	equ	0				; WarpQuake's 16 bpp build of the same body: not used here
+; r_scan060rgb.s assembles this again with PIX16 = 1: the 16 bpp drawers
+; D_DrawSpans8RGB and D_DrawSpans16RGB (16-bit texels from the cache, 16-bit
+; frame); D_DrawZSpans is only in the 8-bit object, for both.
+	ifnd	PIX16
+PIX16	equ	0
+	endif
 
 	xref	_cacheblock			; pixel_t *: the surface's cache block
 	xref	_cachewidth			; int: its width in pixels
@@ -53,9 +58,14 @@ PIX16	equ	0				; WarpQuake's 16 bpp build of the same body: not used here
 	xref	_bbextentt
 	xref	_q2c_count			; unsigned long[]: q2prof.h work counters
 
+	if PIX16
+	xdef	_D_DrawSpans8RGB
+	xdef	_D_DrawSpans16RGB
+	else
 	xdef	_D_DrawSpans8
 	xdef	_D_DrawSpans16
 	xdef	_D_DrawZSpans
+	endif
 
 	xref	_d_pzbuffer		; short *: the z-buffer
 	xref	_d_zwidth		; unsigned: its row length, in shorts
@@ -279,8 +289,14 @@ SpanDrawer	macro
 	move.l	_r_screenwidth,d0
 	muls.l	SPAN_V(a2),d0
 	move.l	_d_viewbuffer,a1
+	if PIX16
+	add.l	SPAN_U(a2),d0
+	add.l	d0,d0				; 2 bytes a pixel
+	add.l	d0,a1
+	else
 	add.l	d0,a1
 	add.l	SPAN_U(a2),a1
+	endif
 	move.l	a3,d0
 	add.l	d0,_q2c_count+Q2C_SPAN_PIXELS
 	addq.l	#1,_q2c_count+Q2C_SPANS
@@ -429,7 +445,11 @@ SpanDrawer	macro
 	endm
 
 	cnop	0,4
+	if PIX16
+_D_DrawSpans8RGB
+	else
 _D_DrawSpans8
+	endif
 	SpanDrawer	8,3,$41000000
 
 ;------------------------------------------------------------------------------
@@ -549,7 +569,7 @@ LastSteps	macro
 
 	cnop	0,4
 	if PIX16
-_D_DrawSpansRGB
+_D_DrawSpans16RGB
 	else
 _D_DrawSpans16
 	endif
@@ -1073,6 +1093,7 @@ _D_DrawSpans16
 	rts
 
 
+	if PIX16==0
 ;------------------------------------------------------------------------------
 ; void D_DrawZSpans (espan_t *pspan)
 ;
@@ -1163,6 +1184,8 @@ _D_DrawZSpans
 
 	movem.l	(sp)+,d2-d7
 	rts
+
+	endif
 
 ;------------------------------------------------------------------------------
 ; recip_up: 1/d for d = 1..15 as 80-bit extendeds, rounded UP (generated with

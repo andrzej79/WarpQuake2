@@ -11,10 +11,18 @@
 ; out of them (SUBX gives 0 or -1) step the texel pointer by one texel and by
 ; one skin row.
 ;
+; r_polyse060rgb.s assembles this again with PIX16 = 1: the 16 bpp span
+; drawer R_PolysetDrawSpansRGB_Opaque (vid.colormap16, 16-bit frame; the
+; packages still hold 8-bit frame addresses, doubled here as RGB_DEST does).
+;
 ; Calling convention: vbcc's, arguments on the stack, d0-d1/a0-a1 scratch.
 ;
 
 	machine	68060
+
+	ifnd	PIX16
+PIX16	equ	0
+	endif
 
 	xref	_d_aspancount		; int: this triangle's span lengths ...
 	xref	_errorterm			; ... stepped Bresenham-style
@@ -54,10 +62,19 @@
 	xref	_r_newrefdef		; refdef_t: rdflags
 	xref	_currententity		; entity_t *: flags
 	xref	_q2c_count			; unsigned long[]: q2prof.h work counters
-	xref	_R_PolysetDrawSpans8_OpaqueC	; the C, for the IR goggles
+	xref	_d_viewbuffer		; byte *: the frame (16 bpp: RGB_DEST)
+	if PIX16
+	xref	_R_PolysetDrawSpansRGB_OpaqueC	; the C, for the IR goggles
+	else
+	xref	_R_PolysetDrawSpans8_OpaqueC
+	endif
 
+	if PIX16
+	xdef	_R_PolysetDrawSpansRGB_Opaque
+	else
 	xdef	_R_PolysetDrawSpans8_Opaque
 	xdef	_R_PolysetScanLeftEdge_C
+	endif
 
 ; spanpackage_t (r_local.h), 32 bytes
 PK_PDEST	equ	0
@@ -73,6 +90,7 @@ PK_END		equ	-999999		; count of the package that ends the list
 
 ATD_SKINWIDTH	equ	8			; offsetof (affinetridesc_t, skinwidth)
 VID_COLORMAP	equ	4			; offsetof (viddef_t, colormap)
+VID_COLORMAP16	equ	24			; offsetof (viddef_t, colormap16); r_surf.c checks it
 ; r_polyse.c checks these two offsets at compile time
 REFDEF_RDFLAGS	equ	68			; offsetof (refdef_t, rdflags)
 ENTITY_FLAGS	equ	68			; offsetof (entity_t, flags)
@@ -109,19 +127,31 @@ Q2C_POLY_PIXELS	equ	4*4			; q2c_count[] index, q2prof.h
 ;------------------------------------------------------------------------------
 
 	cnop	0,4
+	if PIX16
+_R_PolysetDrawSpansRGB_Opaque
+	else
 _R_PolysetDrawSpans8_Opaque
+	endif
 	; the IR goggles' remap (Rogue): the C draws that, for the whole model
 	btst	#RDF_IRGOGGLES_BIT,_r_newrefdef+REFDEF_RDFLAGS+3
 	beq.s	.normal
 	move.l	_currententity,a0
 	btst	#RF_IR_VISIBLE_BIT,ENTITY_FLAGS+2(a0)
 	beq.s	.normal
+	if PIX16
+	jmp	_R_PolysetDrawSpansRGB_OpaqueC
+	else
 	jmp	_R_PolysetDrawSpans8_OpaqueC
+	endif
 .normal
 	movem.l	d2-d7/a2-a6,-(sp)
 	move.l	4+11*4(sp),a2
 	move.l	a2,v_pkg
+	if PIX16
+	move.l	_vid+VID_COLORMAP16,a3
+	else
 	move.l	_vid+VID_COLORMAP,a3
+	endif
 	move.l	_r_zistepx,a4
 	move.l	_r_lstepx,a5
 	; the texel step table, indexed by -2s + t for the two fraction carries
@@ -169,6 +199,10 @@ _R_PolysetDrawSpans8_Opaque
 	ble	.nextpackage
 
 	move.l	PK_PDEST(a2),a0
+	if PIX16
+	add.l	a0,a0				; RGB_DEST: 2 * pdest - d_viewbuffer
+	sub.l	_d_viewbuffer,a0
+	endif
 	move.l	PK_PTEX(a2),a1
 	move.l	PK_SFRAC(a2),d4
 	swap	d4				; sfrac < 0x10000: its upper word is 0
@@ -187,9 +221,15 @@ _R_PolysetDrawSpans8_Opaque
 	move.w	d3,d1				; light's bits 8-15 ...
 	move.b	(a1),d1				; ... and the texel
 	move.w	d6,-2(a2)
+	if PIX16
+	move.w	(a3,d1.l*2),(a0)
+.hidden
+	addq.l	#2,a0
+	else
 	move.b	(a3,d1.l),(a0)
 .hidden
 	addq.l	#1,a0
+	endif
 	add.l	a4,d2				; zi
 	add.l	a5,d3				; light
 	add.l	d7,d4				; s fraction: X = its carry
@@ -210,6 +250,7 @@ _R_PolysetDrawSpans8_Opaque
 	movem.l	(sp)+,d2-d7/a2-a6
 	rts
 
+	if PIX16==0
 ;------------------------------------------------------------------------------
 ; void R_PolysetScanLeftEdge_C (int height)
 ;
@@ -301,6 +342,8 @@ _R_PolysetScanLeftEdge_C
 	movem.l	(sp)+,d2-d7/a2-a3
 	rts
 
+
+	endif
 
 	section	BSS,bss
 

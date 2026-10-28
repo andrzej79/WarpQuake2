@@ -68,6 +68,8 @@ typedef struct image_s
 	qboolean        transparent;    // true if any 255 pixels in image
 	int             registration_sequence;  // 0 = free
 	byte		*pixels[4];				// mip levels
+	unsigned short	*pixels16;			// WarpQuake2, 16 bpp: mip 0 as pixels (R_Pixels16)
+	int			pixels16gen;			// ... for this d_rgbgeneration
 } image_t;
 
 
@@ -90,6 +92,7 @@ typedef struct
 									// can be negative for stupid dibs
 	int						width;          
 	int						height;
+	unsigned short			*colormap16;	// WarpQuake2, 16 bpp: the lit pixels (r_rgb.c)
 } viddef_t;
 
 typedef enum
@@ -465,7 +468,7 @@ void R_DrawSurface (void);
 
 extern int              c_surf;
 
-extern byte             r_warpbuffer[WARP_WIDTH * WARP_HEIGHT];
+extern byte             r_warpbuffer[WARP_WIDTH * WARP_HEIGHT * 2];	// 2: 16 bpp
 
 
 
@@ -575,6 +578,7 @@ extern cvar_t   *r_speeds;
 extern cvar_t   *r_lightlevel;  //FIXME HACK
 
 extern cvar_t	*vid_fullscreen;
+extern cvar_t	*vid_bpp;
 extern	cvar_t	*vid_gamma;
 
 
@@ -836,6 +840,44 @@ typedef struct swstate_s
 void R_IMFlatShadedQuad( vec3_t a, vec3_t b, vec3_t c, vec3_t d, int color, float alpha );
 
 extern swstate_t sw_state;
+
+/*
+====================================================================
+
+WarpQuake2: 16 bpp (r_rgb.c)
+
+On a 16-bit screen the renderer draws RGB565 pixels (big-endian, the
+Warp's 16-bit format; the platform converts for others).  Every pixel
+loop has a 16-bit twin.  The rasterizers are not changed: they still
+compute 8-bit frame addresses (d_viewbuffer + row * r_screenwidth + u),
+and a 16-bit loop doubles the offset (RGB_DEST).  The surface cache, the
+sky, the warping textures and the sprites hold pixels; alias skins and
+the 2D pictures stay palette indexes, looked up as they are drawn.
+
+-rgbtest builds the tables of palette indexes instead (colormap16 = the
+8-bit colormap, d_8to16table = identity, blends through vid.alphamap), so
+the low byte of every 16-bit pixel is the 8-bit renderer's, and -crc (on
+those bytes) must give the 8-bit CRCs.
+====================================================================
+*/
+
+extern int				r_pixbytes;			// 1, or 2 on a 16-bit screen
+extern qboolean			d_rgbtest;
+extern unsigned short	d_8to16table[256];	// the palette as pixels
+extern unsigned			r_rgbkey;			// a 16-bit sprite's transparent pixel
+extern int				d_rgbgeneration;	// bumped when the tables change
+
+void	R_RGB_ModeChanged (void);					// after SWimp_SetMode
+void	R_RGB_SetPalette (const byte *palette);		// sw_state.currentpalette
+void	R_RGB_SetBlend (const float *blend);		// r_newrefdef.blend: a flash, at the blit
+unsigned short *R_Pixels16 (image_t *image);		// mip 0 as pixels; 255 -> r_rgbkey
+unsigned short R_RGBMix (unsigned a, unsigned b, unsigned wa);	// a*wa/32 + b*(32-wa)/32
+
+// a 16-bit frame address from the 8-bit one the rasterizers compute
+#define RGB_DEST(p)		((unsigned short *)((byte *)(p) + ((byte *)(p) - (byte *)d_viewbuffer)))
+// the alphamap's two blends: 66% of s over d, and 33%
+#define RGB_BLEND66(s,d)	(d_rgbtest ? vid.alphamap[((s)<<8) + (d)] : R_RGBMix ((s), (d), 21))
+#define RGB_BLEND33(s,d)	(d_rgbtest ? vid.alphamap[(s) + ((d)<<8)] : R_RGBMix ((s), (d), 11))
 
 /*
 ====================================================================

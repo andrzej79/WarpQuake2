@@ -25,8 +25,8 @@
 ; Calling convention: vbcc's, no arguments (everything is in r_surf.c's
 ; globals, which id kept non-static for their x86 version of this file).
 ;
-; WarpQuake also assembles this with PIX16 = 1 for its 16 bpp surface cache;
-; that part is kept but not built here.
+; r_surf060rgb.s assembles this again with PIX16 = 1: the 16 bpp drawers
+; (R_DrawSurfaceBlockRGB_mip0..3), lighting through vid.colormap16.
 ;
 
 	machine	68060
@@ -59,7 +59,7 @@ PIX16	equ	0
 	endif
 
 VID_COLORMAP	equ	4		; offsetof (viddef_t, colormap), r_local.h
-VID_COLORMAP16	equ	8		; offsetof (viddef_t, colormap16)
+VID_COLORMAP16	equ	24		; offsetof (viddef_t, colormap16); r_surf.c checks it
 PIXB		equ	PIX16+1		; bytes a surface cache pixel
 
 	section	CODE,code		; vbcc's name: one hunk with the C, the profiler's map covers it

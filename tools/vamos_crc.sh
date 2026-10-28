@@ -5,6 +5,7 @@
 #
 #   tools/vamos_crc.sh [binary] [extra engine options...]
 #
+# DEMO (default demo1) picks the demo.
 # Needs VAMOS (default temp/vamos-venv/bin/vamos) and the game data in
 # baseq2/ next to this repository's root (git-ignored).  Prints the Q2BENCH
 # line; the per-frame CRCs go to temp/vw/crc.txt.
@@ -21,4 +22,4 @@ rm -f "$W/crc.txt" "$W/warpq2/config.cfg"	# from the defaults every time
 cd "$W"
 "$VAMOS" -C 68040 -s 1200 -m 262144 -H disable -V work:"$W" -- work:WarpQuake2 -headless -benchmark -crc \
   -crcfile work:crc.txt "$@" +set basedir work: +set game warpq2 +set fixedtime 100 +set timedemo 1 \
-  +demomap demo1.dm2 2>&1 | grep -a 'Q2BENCH\|rror'
+  +demomap ${DEMO:-demo1}.dm2 2>&1 | grep -a 'Q2BENCH\|rror'

@@ -2,13 +2,13 @@
 """Run a WarpQuake2 timedemo on the Amiga and print its result.
 
   bench.py [--name NAME] [--no-upload] [--runs N] [--crc] [--prof] [--sample]
-           [--demo demo1.dm2] [--mode 0] [--limit SECONDS] [-- extra engine arguments]
+           [--demo demo1.dm2] [--mode 0] [--bpp 8|16] [--limit SECONDS] [-- extra engine arguments]
 
 Uploads build/WarpQuake2 as WORK:Games/WarpQuake2/<NAME> (default WarpQuake2), so two
 builds can sit side by side for A/B runs, then runs it:
 
   <NAME> -benchmark [-crc] [-prof] [-sample] +set basedir <BASEDIR> +set game warpq2
-         +set fixedtime 100 +set sw_mode <MODE> +set timedemo 1 +demomap <DEMO>
+         +set fixedtime 100 +set sw_mode <MODE> +set vid_bpp <BPP> +set timedemo 1 +demomap <DEMO>
 
 -benchmark makes the game quit when the demo ends, so the call returns at once, with the
 "Q2BENCH ..." line it prints (and, with --prof, the phase table).  fixedtime 100 steps one
@@ -71,6 +71,7 @@ def main():
     ap.add_argument('--sample', action='store_true')
     ap.add_argument('--demo', default='demo1.dm2')
     ap.add_argument('--mode', default='0')
+    ap.add_argument('--bpp', default='8')
     ap.add_argument('--limit', type=int, default=400)
     ap.add_argument('--verbose', '-v', action='store_true')
     ap.add_argument('extra', nargs='*')
@@ -98,7 +99,7 @@ def main():
     # extra arguments up to the first '+' are options (-crcfile RAM:x), the rest commands
     first_plus = next((i for i, x in enumerate(a.extra) if x.startswith('+')), len(a.extra))
     dash += a.extra[:first_plus]
-    plus = ['+set basedir %s +set game warpq2 +set fixedtime 100 +set sw_mode %s' % (basedir, a.mode)]
+    plus = ['+set basedir %s +set game warpq2 +set fixedtime 100 +set sw_mode %s +set vid_bpp %s' % (basedir, a.mode, a.bpp)]
     plus += a.extra[first_plus:]
     plus += ['+set timedemo 1 +demomap %s' % a.demo]
     cmdline = '%s %s %s' % (a.name, ' '.join(dash), ' '.join(plus))

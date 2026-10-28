@@ -147,6 +147,22 @@ void Draw_Char (int x, int y, int num)
 		drawline = 8;
 
 
+	if (r_pixbytes == 2)
+	{	// WarpQuake2: 16 bpp
+		unsigned short	*dest16 = (unsigned short *)vid.buffer + y*vid.rowbytes + x;
+		int				i;
+
+		while (drawline--)
+		{
+			for (i = 0 ; i < 8 ; i++)
+				if (source[i] != TRANSPARENT_COLOR)
+					dest16[i] = d_8to16table[source[i]];
+			source += 128;
+			dest16 += vid.rowbytes;
+		}
+		return;
+	}
+
 	dest = vid.buffer + y*vid.rowbytes + x;
 
 	while (drawline--)
@@ -220,6 +236,25 @@ void Draw_StretchPicImplementation (int x, int y, int w, int h, image_t	*pic)
 	}
 	else
 		skip = 0;
+
+	if (r_pixbytes == 2)
+	{	// WarpQuake2: 16 bpp
+		unsigned short	*dest16 = (unsigned short *)vid.buffer + y * vid.rowbytes + x;
+
+		fstep = pic->width*0x10000/w;
+		for (v=0 ; v<height ; v++, dest16 += vid.rowbytes)
+		{
+			sv = (skip + v)*pic->height/h;
+			source = pic->pixels[0] + sv*pic->width;
+			if (w == pic->width)
+				for (u=0 ; u<w ; u++)
+					dest16[u] = d_8to16table[source[u]];
+			else
+				for (u=0, f=0 ; u<w ; u++, f += fstep)
+					dest16[u] = d_8to16table[source[f>>16]];
+		}
+		return;
+	}
 
 	dest = vid.buffer + y * vid.rowbytes + x;
 
@@ -313,6 +348,23 @@ void Draw_Pic (int x, int y, char *name)
 		height += y;
 		source += pic->width*-y;
 		y = 0;
+	}
+
+	if (r_pixbytes == 2)
+	{	// WarpQuake2: 16 bpp
+		unsigned short	*dest16 = (unsigned short *)vid.buffer + y * vid.rowbytes + x;
+
+		for (v=0 ; v<height ; v++, dest16 += vid.rowbytes, source += pic->width)
+		{
+			if (!pic->transparent)
+				for (u=0 ; u<pic->width ; u++)
+					dest16[u] = d_8to16table[source[u]];
+			else
+				for (u=0 ; u<pic->width ; u++)
+					if ((tbyte = source[u]) != TRANSPARENT_COLOR)
+						dest16[u] = d_8to16table[tbyte];
+		}
+		return;
 	}
 
 	dest = vid.buffer + y * vid.rowbytes + x;
@@ -410,6 +462,18 @@ void Draw_TileClear (int x, int y, int w, int h, char *name)
 		return;
 	}
 	x2 = x + w;
+	if (r_pixbytes == 2)
+	{	// WarpQuake2: 16 bpp
+		unsigned short	*pdest16 = (unsigned short *)vid.buffer + y*vid.rowbytes;
+
+		for (i=0 ; i<h ; i++, pdest16 += vid.rowbytes)
+		{
+			psrc = pic->pixels[0] + pic->width * ((i+y)&63);
+			for (j=x ; j<x2 ; j++)
+				pdest16[j] = d_8to16table[psrc[j&63]];
+		}
+		return;
+	}
 	pdest = vid.buffer + y*vid.rowbytes;
 	for (i=0 ; i<h ; i++, pdest += vid.rowbytes)
 	{
@@ -448,6 +512,15 @@ void Draw_Fill (int x, int y, int w, int h, int c)
 	}
 	if (w < 0 || h < 0)
 		return;
+	if (r_pixbytes == 2)
+	{	// WarpQuake2: 16 bpp
+		unsigned short	*dest16 = (unsigned short *)vid.buffer + y*vid.rowbytes + x, pix = d_8to16table[c & 0xFF];
+
+		for (v=0 ; v<h ; v++, dest16 += vid.rowbytes)
+			for (u=0 ; u<w ; u++)
+				dest16[u] = pix;
+		return;
+	}
 	dest = vid.buffer + y*vid.rowbytes + x;
 	for (v=0 ; v<h ; v++, dest += vid.rowbytes)
 		for (u=0 ; u<w ; u++)
@@ -466,6 +539,21 @@ void Draw_FadeScreen (void)
 	int			x,y;
 	byte		*pbuf;
 	int	t;
+
+	if (r_pixbytes == 2)
+	{	// WarpQuake2: 16 bpp, the same pattern of black pixels
+		unsigned short	*pbuf16;
+
+		for (y=0 ; y<vid.height ; y++)
+		{
+			pbuf16 = (unsigned short *)vid.buffer + vid.rowbytes*y;
+			t = (y & 1) << 1;
+			for (x=0 ; x<vid.width ; x++)
+				if ((x & 3) != t)
+					pbuf16[x] = 0;
+		}
+		return;
+	}
 
 	for (y=0 ; y<vid.height ; y++)
 	{

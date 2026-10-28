@@ -39,7 +39,7 @@ model_t		*currentmodel;
 
 model_t		*r_worldmodel;
 
-byte		r_warpbuffer[WARP_WIDTH * WARP_HEIGHT];
+byte		r_warpbuffer[WARP_WIDTH * WARP_HEIGHT * 2];	// 2: 16 bpp
 
 swstate_t sw_state;
 
@@ -135,6 +135,7 @@ cvar_t	*r_speeds;
 cvar_t	*r_lightlevel;	//FIXME HACK
 
 cvar_t	*vid_fullscreen;
+cvar_t	*vid_bpp;			// WarpQuake2: 8, or 16 (the platform opens the mode)
 cvar_t	*vid_gamma;
 
 //PGM
@@ -273,6 +274,7 @@ void R_Register (void)
 	r_novis = ri.Cvar_Get( "r_novis", "0", 0 );
 
 	vid_fullscreen = ri.Cvar_Get( "vid_fullscreen", "0", CVAR_ARCHIVE );
+	vid_bpp = ri.Cvar_Get( "vid_bpp", "8", CVAR_ARCHIVE );
 	vid_gamma = ri.Cvar_Get( "vid_gamma", "1.0", CVAR_ARCHIVE );
 
 	ri.Cmd_AddCommand ("modellist", Mod_Modellist_f);
@@ -941,6 +943,12 @@ void R_CalcPalette (void)
 	vec3_t	premult;
 	int		v;
 
+	if (r_pixbytes == 2)
+	{	// WarpQuake2: blended into the frame as it is shown
+		R_RGB_SetBlend (r_newrefdef.blend);
+		return;
+	}
+
 	alpha = r_newrefdef.blend[3];
 	if (alpha <= 0)
 	{
@@ -1016,7 +1024,7 @@ void R_RenderFrame (refdef_t *fd)
 	// differ from run to run; cleared, every frame depends on its own input
 	if (q2p_crcon)
 	{
-		memset (vid.buffer, 0, vid.rowbytes * vid.height);
+		memset (vid.buffer, 0, vid.rowbytes * vid.height * r_pixbytes);
 		memset (d_pzbuffer, 0, vid.width * vid.height * sizeof(*d_pzbuffer));
 	}
 	R_RenderFrame2 (fd);
@@ -1143,6 +1151,7 @@ void R_InitGraphics( int width, int height )
 
 	d_pzbuffer = malloc(vid.width*vid.height*2);
 
+	R_RGB_ModeChanged ();
 	R_InitCaches ();
 
 	R_GammaCorrectAndSetPalette( ( const unsigned char *) d_8to24table );
@@ -1166,7 +1175,7 @@ void R_BeginFrame( float camera_separation )
 		vid_gamma->modified = false;
 	}
 
-	while ( sw_mode->modified || vid_fullscreen->modified )
+	while ( sw_mode->modified || vid_fullscreen->modified || vid_bpp->modified )
 	{
 		rserr_t err;
 
@@ -1181,12 +1190,14 @@ void R_BeginFrame( float camera_separation )
 			sw_state.prev_mode = sw_mode->value;
 			vid_fullscreen->modified = false;
 			sw_mode->modified = false;
+			vid_bpp->modified = false;
 		}
 		else
 		{
 			if ( err == rserr_invalid_mode )
 			{
 				ri.Cvar_SetValue( "sw_mode", sw_state.prev_mode );
+				vid_bpp->modified = false;	// SWimp_SetMode fell back to 8 bpp, or failed
 				ri.Con_Printf( PRINT_ALL, "ref_soft::R_BeginFrame() - could not set mode\n" );
 			}
 			else if ( err == rserr_invalid_fullscreen )
@@ -1220,6 +1231,8 @@ void R_GammaCorrectAndSetPalette( const unsigned char *palette )
 		sw_state.currentpalette[i*4+1] = sw_state.gammatable[palette[i*4+1]];
 		sw_state.currentpalette[i*4+2] = sw_state.gammatable[palette[i*4+2]];
 	}
+	if (r_pixbytes == 2)
+		R_RGB_SetPalette (sw_state.currentpalette);
 
 	SWimp_SetPalette( sw_state.currentpalette );
 }
@@ -1234,10 +1247,10 @@ void R_CinematicSetPalette( const unsigned char *palette )
 	int		*d;
 
 	// clear screen to black to avoid any palette flash
-	w = abs(vid.rowbytes)>>2;	// stupid negative pitch win32 stuff...
+	w = (abs(vid.rowbytes)*r_pixbytes)>>2;	// stupid negative pitch win32 stuff...
 	for (i=0 ; i<vid.height ; i++, d+=w)
 	{
-		d = (int *)(vid.buffer + i*vid.rowbytes);
+		d = (int *)(vid.buffer + i*vid.rowbytes*r_pixbytes);
 		for (j=0 ; j<w ; j++)
 			d[j] = 0;
 	}

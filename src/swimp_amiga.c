@@ -35,7 +35,7 @@ void SWimp_EndFrame(void)
 {
   {
     Q2P_BEGIN(Q2P_CRC);
-    Q2P_FrameCRC(vid.buffer, vid.width, vid.height, vid.rowbytes);
+    Q2P_FrameCRC(vid.buffer, vid.width, vid.height, vid.rowbytes * r_pixbytes, r_pixbytes);
     Q2P_END(Q2P_CRC);
   }
   {
@@ -43,11 +43,17 @@ void SWimp_EndFrame(void)
     static cvar_t *vid_blit;
 
     if(vid_blit == NULL) {
-      vid_blit = ri.Cvar_Get("vid_blit", "0", CVAR_ARCHIVE);
+      vid_blit = ri.Cvar_Get("vid_blit", "-1", CVAR_ARCHIVE);  // auto (amiga_q2.h)
     }
-    qaScreenBlit(vid.buffer, vid.rowbytes, vid.width, vid.height, (int)vid_blit->value);
+    qaScreenBlit(vid.buffer, vid.rowbytes * r_pixbytes, vid.width, vid.height, (int)vid_blit->value);
     Q2P_END(Q2P_BLIT);
   }
+}
+
+// 16 bpp: the palette blend, done as the frame is shown (r_rgb.c)
+void SWimp_SetBlend(int r, int g, int b, int alpha)
+{
+  qaScreenBlend(r, g, b, alpha);
 }
 
 void SWimp_SetPalette(const unsigned char *palette)
@@ -67,7 +73,8 @@ void SWimp_Shutdown(void)
 
 rserr_t SWimp_SetMode(int *pwidth, int *pheight, int mode, qboolean fullscreen)
 {
-  int w, h;
+  int w, h, depth;
+  cvar_t *bpp = ri.Cvar_Get("vid_bpp", "8", CVAR_ARCHIVE);
 
   ri.Con_Printf(PRINT_ALL, "setting mode %d:", mode);
   if(!ri.Vid_GetModeInfo(&w, &h, mode)) {
@@ -78,16 +85,21 @@ rserr_t SWimp_SetMode(int *pwidth, int *pheight, int mode, qboolean fullscreen)
 
   qaInputStop();
   freeFrame();
-  if(!qaScreenOpen(w, h)) {
+  depth = qaScreenOpen(w, h, bpp->value >= 15 ? 16 : 8);
+  if(!depth) {
     ri.Con_Printf(PRINT_ALL, "no RTG screen mode for %dx%d\n", w, h);
     return rserr_invalid_mode;
   }
+  if(depth != 16 && bpp->value >= 15) {
+    ri.Cvar_Set("vid_bpp", "8");       // there is no 16-bit mode
+  }
+  r_pixbytes = depth / 8;
   // the frame is the screen's own size, within the renderer's limits
   w = qaScreenWidth() < MAXWIDTH ? qaScreenWidth() : MAXWIDTH;
   h = qaScreenHeight() < MAXHEIGHT ? qaScreenHeight() : MAXHEIGHT;
   ri.Con_Printf(PRINT_ALL, "RTG %s, frame %dx%d\n", qaScreenInfo(), w, h);
 
-  frameAlloc = malloc(w * h + 15);
+  frameAlloc = malloc(w * h * r_pixbytes + 15);
   if(frameAlloc == NULL) {
     qaScreenClose();
     return rserr_invalid_mode;

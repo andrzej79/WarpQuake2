@@ -791,6 +791,19 @@ void D_FlatFillSurface (surf_t *surf, int color)
 	byte	*pdest;
 	int		u, u2;
 	
+	if (r_pixbytes == 2)
+	{	// WarpQuake2: 16 bpp
+		unsigned short	*pdest16, pix = d_8to16table[color & 0xFF];
+
+		for (span=surf->spans ; span ; span=span->pnext)
+		{
+			pdest16 = (unsigned short *)d_viewbuffer + r_screenwidth*span->v + span->u;
+			for (u = 0 ; u < span->count ; u++)
+				pdest16[u] = pix;
+		}
+		return;
+	}
+
 	for (span=surf->spans ; span ; span=span->pnext)
 	{
 		pdest = (byte *)d_viewbuffer + r_screenwidth*span->v;
@@ -865,6 +878,32 @@ void D_CalcGradients (msurface_t *pface)
 
 /*
 ==============
+D_DrawSurfSpans
+
+WarpQuake2: the span drawer for the pixel size and sw_subdiv16.
+==============
+*/
+void D_DrawSpans8RGB (espan_t *pspan);
+void D_DrawSpans16RGB (espan_t *pspan);
+
+static void D_DrawSurfSpans (espan_t *spans)
+{
+	if (r_pixbytes == 2)
+	{
+		if (sw_subdiv16->value)
+			D_DrawSpans16RGB (spans);
+		else
+			D_DrawSpans8RGB (spans);
+	}
+	else if (sw_subdiv16->value)
+		D_DrawSpans16 (spans);
+	else
+		D_DrawSpans8 (spans);
+}
+
+
+/*
+==============
 D_BackgroundSurf
 
 The grey background filler seen when there is a hole in the map
@@ -896,6 +935,8 @@ void D_TurbulentSurf (surf_t *s)
 	pface = s->msurf;
 	miplevel = 0;
 	cacheblock = pface->texinfo->image->pixels[0];
+	if (r_pixbytes == 2)
+		cacheblock = (pixel_t *)R_Pixels16 (pface->texinfo->image);
 	cachewidth = 64;
 
 	if (s->insubmodel)
@@ -955,6 +996,8 @@ void D_SkySurf (surf_t *s)
 	if (!pface->texinfo->image)
 		return;
 	cacheblock = pface->texinfo->image->pixels[0];
+	if (r_pixbytes == 2)
+		cacheblock = (pixel_t *)R_Pixels16 (pface->texinfo->image);
 	cachewidth = 256;
 
 	d_zistepu = s->d_zistepu;
@@ -963,10 +1006,7 @@ void D_SkySurf (surf_t *s)
 
 	D_CalcGradients (pface);
 
-	if (sw_subdiv16->value)
-		D_DrawSpans16 (s->spans);
-	else
-		D_DrawSpans8 (s->spans);
+	D_DrawSurfSpans (s->spans);
 
 // set up a gradient for the background surface that places it
 // effectively at infinity distance from the viewpoint
@@ -1043,10 +1083,7 @@ void D_SolidSurf (surf_t *s)
 
 	D_CalcGradients (pface);
 
-	if (sw_subdiv16->value)
-		D_DrawSpans16 (s->spans);
-	else
-		D_DrawSpans8 (s->spans);
+	D_DrawSurfSpans (s->spans);
 
 	D_DrawZSpans (s->spans);
 

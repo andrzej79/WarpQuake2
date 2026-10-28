@@ -651,6 +651,12 @@ void R_ScreenShot_f (void)
 		return;
 	}
 
+	if (r_pixbytes == 2)
+	{	// WarpQuake2: the frame is RGB pixels, not palette indexes
+		ri.Con_Printf (PRINT_ALL, "screenshot: 8 bpp only\n");
+		return;
+	}
+
 	// turn the current 32 bit palette into a 24 bit palette
 	for (i=0 ; i<256 ; i++)
 	{

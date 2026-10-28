@@ -40,14 +40,20 @@ void qaFindClose(void);
 // -headless (vamos, which has no graphics): no screen, no input; the frame is
 // only rendered, at the size asked for
 extern int qaHeadless;
-int qaScreenOpen(int width, int height);   // an 8-bit screen in the closest RTG mode; 0 on failure
+// A screen in the closest RTG mode of that depth (8 or 16; 8 if there is no
+// 16-bit one): the depth it opened, 0 on failure.  A 16-bit frame is
+// big-endian RGB565.
+int qaScreenOpen(int width, int height, int depth);
 void qaScreenClose(void);
 void qaScreenShutdown(void);                // the screen and the libraries, at exit
 int qaScreenWidth(void);                   // the open screen's (may exceed the frame's)
 int qaScreenHeight(void);
-// mode 0: WriteChunkyPixels; 1: the bitmap locked and the rows copied with
-// CopyMemQuick (falls back to 0 if it cannot be locked)
+// mode 0: WriteChunkyPixels (8 bpp) or p96WritePixelArray (16); 1: the
+// bitmap locked and the rows copied with CopyMemQuick; 2: the same with
+// MOVE16 (falls back to 0 if it cannot be locked); -1: 2 on a Warp board,
+// 0 on any other.  rowBytes in bytes.
 void qaScreenBlit(const unsigned char *pixels, int rowBytes, int width, int height, int mode);
+void qaScreenBlend(int r, int g, int b, int alpha);  // 16 bpp: alpha 0..256, 0 = off
 void qaScreenPalette(const unsigned char *rgba);  // 256 entries of R, G, B, unused
 const char *qaScreenInfo(void);
 

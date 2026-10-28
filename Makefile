@@ -98,6 +98,10 @@ $(OBJ_DIR)/src/%.o: src/%.s
 	@$(MKDIR) $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<
 
+# The 16 bpp builds of the asm drawers: X060rgb.s sets PIX16 and includes
+# X060.s, so it is rebuilt when that changes.
+$(foreach f,$(wildcard quake2/ref_soft/*060rgb.s),$(eval $(OBJ_DIR)/quake2/ref_soft/$(notdir $(f:.s=.o)): $(f:rgb.s=.s)))
+
 # For profiling: the same objects linked without stripping, plus a map.
 VBCC_LIB := $(VBCC)/targets/m68k-amigaos/lib
 prof: $(OBJS)

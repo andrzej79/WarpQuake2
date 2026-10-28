@@ -119,7 +119,26 @@ void Q2P_InputCRC(int kind, const void *data, int bytes)
   }
 }
 
-void Q2P_FrameCRC(const unsigned char *buf, int width, int height, int rowbytes)
+// 16 bpp (pixbytes 2): the low byte of each pixel, which -rgbtest makes
+// the 8-bit renderer's palette index (r_rgb.c)
+static const unsigned char *LowBytes(const unsigned char *row, int width, int pixbytes)
+{
+  static unsigned char low[2048];
+  int x;
+
+  if(pixbytes == 1) {
+    return row;
+  }
+  if(width > (int)sizeof(low)) {
+    width = sizeof(low);
+  }
+  for(x = 0; x < width; x++) {
+    low[x] = row[x * 2 + 1];
+  }
+  return low;
+}
+
+void Q2P_FrameCRC(const unsigned char *buf, int width, int height, int rowbytes, int pixbytes)
 {
   unsigned long crc = 0xFFFFFFFFUL;
   unsigned char be[4];
@@ -132,7 +151,7 @@ void Q2P_FrameCRC(const unsigned char *buf, int width, int height, int rowbytes)
     return;
   }
   for(y = 0; y < height; y++) {
-    crc = CRCUpdate(crc, buf + y * rowbytes, width);
+    crc = CRCUpdate(crc, LowBytes(buf + y * rowbytes, width, pixbytes), width);
   }
   crc ^= 0xFFFFFFFFUL;
 
@@ -166,11 +185,21 @@ void Q2P_FrameCRC(const unsigned char *buf, int width, int height, int rowbytes)
   for(y = 0; y < numDumps && crcDump[y] != crcFrames; y++) {
   }
   if(y < numDumps) {
+    // 16 bpp: the low bytes (the palette indexes, with -rgbtest), and the
+    // pixels themselves (big-endian RGB565) next to them
     FILE *f = fopen(va("%sframe%lu_%dx%d.raw", ArgValue("-crcdumpdir", "RAM:"), crcFrames, width, height), "wb");
 
     if(f) {
       for(y = 0; y < height; y++) {
-        fwrite(buf + y * rowbytes, 1, width, f);
+        fwrite(LowBytes(buf + y * rowbytes, width, pixbytes), 1, width, f);
+      }
+      fclose(f);
+    }
+    if(pixbytes == 2 && (f = fopen(va("%sframe%lu_%dx%d.rgb565", ArgValue("-crcdumpdir", "RAM:"), crcFrames, width,
+                                      height),
+                                   "wb")) != NULL) {
+      for(y = 0; y < height; y++) {
+        fwrite(buf + y * rowbytes, 2, width, f);
       }
       fclose(f);
     }

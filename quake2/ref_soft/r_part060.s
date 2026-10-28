@@ -14,11 +14,20 @@
 ; single, here by FSMOVE), 1/z stays extended, and the screen position is
 ; truncated after adding 0.5.  tools/vamos_crc.sh checks it.
 ;
+; r_part060rgb.s assembles this again with PIX16 = 1: R_DrawParticleListRGB,
+; the 16 bpp drawer (R_DrawParticleRGB in r_part.c): the colour through
+; d_8to16table, the blends mixed per channel as R_RGBMix does (or, with
+; -rgbtest, through vid.alphamap on the palette indexes, as the 8-bit one).
+;
 ; Calling convention: vbcc's, arguments on the stack, d0-d1/a0-a1/fp0-fp1
 ; scratch, everything else preserved.
 ;
 
 	machine	68060
+
+	ifnd	PIX16
+PIX16	equ	0
+	endif
 
 	xref	_r_origin			; vec3_t
 	xref	_r_pright			; vec3_t: vright * xscaleshrink (R_DrawParticles)
@@ -40,7 +49,13 @@
 	xref	_d_pix_max
 	xref	_vid				; viddef_t: alphamap at VID_ALPHAMAP
 
+	if PIX16
+	xref	_d_8to16table		; unsigned short [256]
+	xref	_d_rgbtest			; qboolean
+	xdef	_R_DrawParticleListRGB
+	else
 	xdef	_R_DrawParticleList
+	endif
 
 ; particle_t (ref.h), 20 bytes
 P_ORG		equ	0
@@ -80,6 +95,59 @@ StoreOpaque	macro
 	move.b	d6,(a3,d1.l)
 	endm
 
+; 16 bpp: d6 is the pixel (opaque), or spread(colour) * its weight (Mix, \1 =
+; the frame's weight, 32 minus the colour's: R_RGBMix), or the colour's
+; palette index (-rgbtest: the 8-bit stores on the low bytes)
+Store16Opaque	macro
+	move.w	d6,(a3,d1.l*2)
+	endm
+
+Mix	macro
+	moveq	#0,d0
+	move.w	(a3,d1.l*2),d0
+	move.l	d0,d2
+	swap	d2
+	or.l	d2,d0
+	and.l	#$07E0F81F,d0			; spread
+	mulu.l	#\1,d0
+	add.l	d6,d0
+	lsr.l	#5,d0
+	and.l	#$07E0F81F,d0
+	move.l	d0,d2
+	swap	d2
+	or.w	d2,d0				; folded
+	move.w	d0,(a3,d1.l*2)
+	endm
+
+Store16Mix33	macro
+	Mix	21
+	endm
+
+Store16Mix66	macro
+	Mix	11
+	endm
+
+Store16Test33	macro
+	moveq	#0,d0
+	move.w	(a3,d1.l*2),d0
+	lsl.l	#8,d0
+	add.l	d6,d0
+	moveq	#0,d2
+	move.b	(a1,d0.l),d2
+	move.w	d2,(a3,d1.l*2)
+	endm
+
+Store16Test66	macro
+	moveq	#0,d0
+	move.w	(a3,d1.l*2),d0
+	move.l	d6,d2
+	lsl.l	#8,d2
+	add.l	d2,d0
+	moveq	#0,d2
+	move.b	(a1,d0.l),d2
+	move.w	d2,(a3,d1.l*2)
+	endm
+
 ; One particle's block: pix rows of pix pixels, each drawn if pz <= izi.
 ; \1 = the pixel store macro.
 Block	macro
@@ -87,6 +155,9 @@ Block	macro
 	move.l	_d_zwidth,a4
 	add.l	a4,a4				; a row of the z-buffer, in bytes
 	move.l	_r_screenwidth,a6
+	if PIX16
+	add.l	a6,a6				; and of the frame
+	endif
 .row\@
 	moveq	#0,d1
 .pix\@
@@ -107,7 +178,11 @@ Block	macro
 	endm
 
 	cnop	0,4
+	if PIX16
+_R_DrawParticleListRGB
+	else
 _R_DrawParticleList
+	endif
 	movem.l	d2-d7/a2-a6,-(sp)
 	fmovem.x	fp2-fp7,-(sp)
 	move.l	4+11*4+6*12(sp),a5
@@ -191,8 +266,14 @@ _R_DrawParticleList
 	lea	(a2,d0.l*2),a2
 	lea	_d_scantable,a0
 	move.l	(a0,d3.l*4),a3
+	if PIX16
+	add.l	d2,a3
+	add.l	a3,a3				; 2 bytes a pixel
+	add.l	_d_viewbuffer,a3
+	else
 	add.l	_d_viewbuffer,a3
 	add.l	d2,a3
+	endif
 	; izi = (int)(zi * 0x8000); pix = izi >> d_pix_shift, clamped
 	fmul.s	#$47000000,fp6
 	fintrz.x	fp6
@@ -221,6 +302,34 @@ _R_DrawParticleList
 	fcmp.d	#$3fd51eb851eb851f,fp0	; 0.33
 	fbgt	.p66
 
+	if PIX16
+	and.l	#$ff,d6
+	tst.l	_d_rgbtest
+	beq.s	.mix33
+	Block	Store16Test33
+	bra	.next
+.mix33
+	bsr	SpreadColour
+	mulu.l	#11,d6
+	Block	Store16Mix33
+	bra	.next
+.p66
+	and.l	#$ff,d6
+	tst.l	_d_rgbtest
+	beq.s	.mix66
+	Block	Store16Test66
+	bra	.next
+.mix66
+	bsr	SpreadColour
+	mulu.l	#21,d6
+	Block	Store16Mix66
+	bra	.next
+.opaque
+	and.l	#$ff,d6
+	lea	_d_8to16table,a0
+	move.w	(a0,d6.l*2),d6
+	Block	Store16Opaque
+	else
 	Block	Store33
 	bra	.next
 .p66
@@ -228,6 +337,7 @@ _R_DrawParticleList
 	bra	.next
 .opaque
 	Block	StoreOpaque
+	endif
 
 .next
 	lea	P_SIZE(a5),a5
@@ -238,5 +348,18 @@ _R_DrawParticleList
 	fmovem.x	(sp)+,fp2-fp7
 	movem.l	(sp)+,d2-d7/a2-a6
 	rts
+
+	if PIX16
+; d6 = the palette index -> its pixel, spread over a longword (Mix)
+SpreadColour
+	lea	_d_8to16table,a0
+	moveq	#0,d0
+	move.w	(a0,d6.l*2),d0
+	move.l	d0,d6
+	swap	d6
+	or.l	d0,d6
+	and.l	#$07E0F81F,d6
+	rts
+	endif
 
 	end

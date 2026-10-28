@@ -49,6 +49,24 @@ static void	(*surfmiptable[4])(void) = {
 	R_DrawSurfaceBlock8_mip3
 };
 
+// WarpQuake2: 16 bpp, through vid.colormap16 (r_surf060.s with PIX16, or
+// the C below)
+void R_DrawSurfaceBlockRGB_mip0 (void);
+void R_DrawSurfaceBlockRGB_mip1 (void);
+void R_DrawSurfaceBlockRGB_mip2 (void);
+void R_DrawSurfaceBlockRGB_mip3 (void);
+
+#if Q2_ASM
+typedef char check_colormap16[(offsetof (viddef_t, colormap16) == 24) ? 1 : -1];
+#endif
+
+static void	(*surfmiptableRGB[4])(void) = {
+	R_DrawSurfaceBlockRGB_mip0,
+	R_DrawSurfaceBlockRGB_mip1,
+	R_DrawSurfaceBlockRGB_mip2,
+	R_DrawSurfaceBlockRGB_mip3
+};
+
 void R_BuildLightMap (void);
 extern	unsigned		blocklights[1024];	// allow some very large lightmaps
 
@@ -124,6 +142,11 @@ void R_DrawSurface (void)
 	pblockdrawer = surfmiptable[r_drawsurf.surfmip];
 // TODO: only needs to be set when there is a display settings change
 	horzblockstep = blocksize;
+	if (r_pixbytes == 2)
+	{
+		pblockdrawer = surfmiptableRGB[r_drawsurf.surfmip];
+		horzblockstep = blocksize * 2;
+	}
 
 	smax = mt->width >> r_drawsurf.surfmip;
 	twidth = texwidth;
@@ -376,6 +399,65 @@ void R_DrawSurfaceBlock8_mip3 (void)
 #endif
 
 
+/*
+================
+R_DrawSurfaceBlockRGB
+
+WarpQuake2: the four drawers above at 16 bpp, one body for all (they are
+integer only, so any form of the C draws the same): a block of size x size
+texels, lit through vid.colormap16.  r_surf060.s with PIX16 = 1 in the asm
+build.
+================
+*/
+#if !Q2_ASM
+static void R_DrawSurfaceBlockRGB (int size, int shift)
+{
+	int				v, i, b, lightstep, lighttemp, light;
+	unsigned char	*psource;
+	unsigned short	*prowdest;
+
+	psource = pbasesource;
+	prowdest = prowdestbase;
+
+	for (v=0 ; v<r_numvblocks ; v++)
+	{
+		lightleft = r_lightptr[0];
+		lightright = r_lightptr[1];
+		r_lightptr += r_lightwidth;
+		lightleftstep = (r_lightptr[0] - lightleft) >> shift;
+		lightrightstep = (r_lightptr[1] - lightright) >> shift;
+
+		for (i=0 ; i<size ; i++)
+		{
+			lighttemp = lightleft - lightright;
+			lightstep = lighttemp >> shift;
+
+			light = lightright;
+
+			for (b=size-1; b>=0; b--)
+			{
+				prowdest[b] = vid.colormap16[(light & 0xFF00) + psource[b]];
+				light += lightstep;
+			}
+
+			psource += sourcetstep;
+			lightright += lightrightstep;
+			lightleft += lightleftstep;
+			prowdest = (unsigned short *)((byte *)prowdest + surfrowbytes);
+		}
+
+		if (psource >= r_sourcemax)
+			psource -= r_stepback;
+	}
+}
+
+void R_DrawSurfaceBlockRGB_mip0 (void) { R_DrawSurfaceBlockRGB (16, 4); }
+void R_DrawSurfaceBlockRGB_mip1 (void) { R_DrawSurfaceBlockRGB (8, 3); }
+void R_DrawSurfaceBlockRGB_mip2 (void) { R_DrawSurfaceBlockRGB (4, 2); }
+void R_DrawSurfaceBlockRGB_mip3 (void) { R_DrawSurfaceBlockRGB (2, 1); }
+#endif
+
+
 //============================================================================
 
 
@@ -403,6 +485,8 @@ void R_InitCaches (void)
 		if (pix > 64000)
 			size += (pix-64000)*3;
 	}		
+
+	size *= r_pixbytes;		// WarpQuake2: 16 bpp caches pixels
 
 	// round up to page size
 	size = (size + 8191) & ~8191;
@@ -456,7 +540,7 @@ surfcache_t     *D_SCAlloc (int width, int size)
 	if ((width < 0) || (width > 256))
 		ri.Sys_Error (ERR_FATAL,"D_SCAlloc: bad cache width %d\n", width);
 
-	if ((size <= 0) || (size > 0x10000))
+	if ((size <= 0) || (size > 0x10000 * r_pixbytes))
 		ri.Sys_Error (ERR_FATAL,"D_SCAlloc: bad cache size %d\n", size);
 	
 	size = (int)&((surfcache_t *)0)->data[size];
@@ -511,7 +595,7 @@ surfcache_t     *D_SCAlloc (int width, int size)
 	new->width = width;
 // DEBUG
 	if (width > 0)
-		new->height = (size - sizeof(*new) + sizeof(new->data)) / width;
+		new->height = (size - sizeof(*new) + sizeof(new->data)) / (width * r_pixbytes);
 
 	new->owner = NULL;              // should be set properly after return
 
@@ -613,7 +697,7 @@ surfcache_t *D_CacheSurface (msurface_t *surface, int miplevel)
 	surfscale = 1.0 / (1<<miplevel);
 	r_drawsurf.surfmip = miplevel;
 	r_drawsurf.surfwidth = surface->extents[0] >> miplevel;
-	r_drawsurf.rowbytes = r_drawsurf.surfwidth;
+	r_drawsurf.rowbytes = r_drawsurf.surfwidth * r_pixbytes;	// bytes (WarpQuake2: 16 bpp)
 	r_drawsurf.surfheight = surface->extents[1] >> miplevel;
 	
 //
@@ -622,7 +706,7 @@ surfcache_t *D_CacheSurface (msurface_t *surface, int miplevel)
 	if (!cache)     // if a texture just animated, don't reallocate it
 	{
 		cache = D_SCAlloc (r_drawsurf.surfwidth,
-						   r_drawsurf.surfwidth * r_drawsurf.surfheight);
+						   r_drawsurf.surfwidth * r_drawsurf.surfheight * r_pixbytes);
 		surface->cachespots[miplevel] = cache;
 		cache->owner = &surface->cachespots[miplevel];
 		cache->mipscale = surfscale;

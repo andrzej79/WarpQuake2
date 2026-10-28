@@ -85,7 +85,7 @@ extern int q2p_crcon;   // -crc
 
 void Q2P_Init(void);           // after the command system: registers "prof", "profreset", "profsample"
 void Q2P_FrameStart(void);     // runs a reset asked for mid-frame
-void Q2P_FrameCRC(const unsigned char *buf, int width, int height, int rowbytes);
+void Q2P_FrameCRC(const unsigned char *buf, int width, int height, int rowbytes, int pixbytes);  // rowbytes in bytes
 // -crcfile: what the renderer was given, by kind (0 entities, 1 particles, 2 lights, 3 view)
 void Q2P_InputCRC(int kind, const void *data, int bytes);
 void Q2P_ServerData(void);     // a server (or demo) starts: before anything it sends is parsed

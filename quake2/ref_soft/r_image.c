@@ -579,6 +579,8 @@ void R_FreeUnusedImages (void)
 			continue;		// don't free pics
 		// free it
 		free (image->pixels[0]);	// the other mip levels just follow
+		if (image->pixels16)
+			free (image->pixels16);
 		memset (image, 0, sizeof(*image));
 	}
 }
@@ -611,6 +613,8 @@ void	R_ShutdownImages (void)
 			continue;		// free texture
 		// free it
 		free (image->pixels[0]);	// the other mip levels just follow
+		if (image->pixels16)
+			free (image->pixels16);
 		memset (image, 0, sizeof(*image));
 	}
 }

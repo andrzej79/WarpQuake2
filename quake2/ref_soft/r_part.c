@@ -584,6 +584,72 @@ void R_DrawParticle( void )
     }
 }
 
+/*
+** R_DrawParticleRGB
+**
+** WarpQuake2: R_DrawParticle at 16 bpp, the colour through d_8to16table.
+** The float work is R_DrawParticle's, line for line.
+*/
+void R_DrawParticleRGB( void )
+{
+	particle_t *pparticle = partparms.particle;
+	int         level     = partparms.level;
+	vec3_t	local, transformed;
+	float	zi;
+	unsigned short	*pdest;
+	short	*pz;
+	unsigned	color = d_8to16table[pparticle->color & 0xFF];
+	int		i, izi, pix, count, u, v;
+
+	VectorSubtract (pparticle->origin, r_origin, local);
+
+	transformed[0] = DotProduct(local, r_pright);
+	transformed[1] = DotProduct(local, r_pup);
+	transformed[2] = DotProduct(local, r_ppn);		
+
+	if (transformed[2] < PARTICLE_Z_CLIP)
+		return;
+
+	zi = 1.0 / transformed[2];
+	u = (int)(xcenter + zi * transformed[0] + 0.5);
+	v = (int)(ycenter - zi * transformed[1] + 0.5);
+
+	if ((v > d_vrectbottom_particle) || 
+		(u > d_vrectright_particle) ||
+		(v < d_vrecty) ||
+		(u < d_vrectx))
+	{
+		return;
+	}
+
+	pz = d_pzbuffer + (d_zwidth * v) + u;
+	pdest = RGB_DEST (d_viewbuffer + d_scantable[v] + u);
+	izi = (int)(zi * 0x8000);
+
+	pix = izi >> d_pix_shift;
+	if (pix < d_pix_min)
+		pix = d_pix_min;
+	else if (pix > d_pix_max)
+		pix = d_pix_max;
+
+	for (count = pix ; count ; count--, pz += d_zwidth, pdest += r_screenwidth)
+	{
+		for (i=0 ; i<pix ; i++)
+		{
+			if (pz[i] <= izi)
+			{
+				pz[i] = izi;
+				if (level == PARTICLE_33)
+					pdest[i] = RGB_BLEND33 (color, pdest[i]);
+				else if (level == PARTICLE_66)
+					pdest[i] = RGB_BLEND66 (color, pdest[i]);
+				else
+					pdest[i] = color;
+			}
+		}
+	}
+}
+
 #endif	// !id386
 
 /*
@@ -609,6 +675,7 @@ void R_DrawParticles (void)
 #endif
 
 #if Q2_ASM
+	if (r_pixbytes == 1)
 	{
 		// r_part060.s: the loop below with R_DrawParticle inline; it reads
 		// vid.alphamap at a fixed offset
@@ -617,7 +684,14 @@ void R_DrawParticles (void)
 
 		R_DrawParticleList (r_newrefdef.particles, r_newrefdef.num_particles);
 	}
-#else
+	else if (r_pixbytes == 2)
+	{
+		extern void R_DrawParticleListRGB (particle_t *p, int n);	// r_part060rgb.s
+
+		R_DrawParticleListRGB (r_newrefdef.particles, r_newrefdef.num_particles);
+	}
+	else
+#endif
 	for (p=r_newrefdef.particles, i=0 ; i<r_newrefdef.num_particles ; i++,p++)
 	{
 
@@ -638,9 +712,11 @@ void R_DrawParticles (void)
 			s_prefetch_address = ( unsigned int ) r_newrefdef.particles;
 #endif
 
-		R_DrawParticle();
+		if (r_pixbytes == 2)
+			R_DrawParticleRGB();
+		else
+			R_DrawParticle();
 	}
-#endif
 	Q2C_ADD (Q2C_PARTICLES, r_newrefdef.num_particles);
 
 #if id386 && !defined __linux__

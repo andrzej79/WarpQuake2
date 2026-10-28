@@ -1130,6 +1130,11 @@ void R_AliasDrawModel (void)
 	extern void R_PolysetDrawSpans8_66( void * );
 	extern void R_PolysetDrawSpansConstant8_33( void * );
 	extern void R_PolysetDrawSpansConstant8_66( void * );
+	extern void R_PolysetDrawSpansRGB_Opaque( void * );	// WarpQuake2: 16 bpp
+	extern void R_PolysetDrawSpansRGB_33( void * );
+	extern void R_PolysetDrawSpansRGB_66( void * );
+	extern void R_PolysetDrawSpansConstantRGB_33( void * );
+	extern void R_PolysetDrawSpansConstantRGB_66( void * );
 
 	Q2C_ADD (Q2C_ALIAS_MODELS, 1);
 
@@ -1252,6 +1257,21 @@ void R_AliasDrawModel (void)
 	else
 	{
 		d_pdrawspans = R_PolysetDrawSpans8_Opaque;
+	}
+
+	// WarpQuake2: 16 bpp
+	if (r_pixbytes == 2)
+	{
+		if (d_pdrawspans == R_PolysetDrawSpans8_Opaque)
+			d_pdrawspans = R_PolysetDrawSpansRGB_Opaque;
+		else if (d_pdrawspans == R_PolysetDrawSpans8_66)
+			d_pdrawspans = R_PolysetDrawSpansRGB_66;
+		else if (d_pdrawspans == R_PolysetDrawSpans8_33)
+			d_pdrawspans = R_PolysetDrawSpansRGB_33;
+		else if (d_pdrawspans == R_PolysetDrawSpansConstant8_66)
+			d_pdrawspans = R_PolysetDrawSpansConstantRGB_66;
+		else
+			d_pdrawspans = R_PolysetDrawSpansConstantRGB_33;
 	}
 
 	/*

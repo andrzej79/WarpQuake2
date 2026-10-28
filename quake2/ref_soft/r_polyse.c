@@ -1127,6 +1127,151 @@ void R_PolysetDrawSpans8_Opaque (spanpackage_t *pspanpackage)
 #endif
 
 
+
+/*
+================
+R_PolysetDrawSpansRGB_*
+
+WarpQuake2: the span drawers above at 16 bpp.  The packages hold 8-bit
+frame addresses (the rasterizer is the 8-bit one); the texels are palette
+indexes, lit through vid.colormap16.  Integer only, so they draw what the
+8-bit ones draw (-rgbtest).  SPANLOOP is the walk all of them share.
+================
+*/
+#define SPANLOOP_BEGIN \
+	do \
+	{ \
+		lcount = d_aspancount - pspanpackage->count; \
+		errorterm += erroradjustup; \
+		if (errorterm >= 0) \
+		{ \
+			d_aspancount += d_countextrastep; \
+			errorterm -= erroradjustdown; \
+		} \
+		else \
+			d_aspancount += ubasestep; \
+		if (lcount) \
+		{ \
+			lpdest = RGB_DEST (pspanpackage->pdest); \
+			lptex = pspanpackage->ptex; \
+			lpz = pspanpackage->pz; \
+			lsfrac = pspanpackage->sfrac; \
+			ltfrac = pspanpackage->tfrac; \
+			llight = pspanpackage->light; \
+			lzi = pspanpackage->zi; \
+			do \
+			{
+
+#define SPANLOOP_STEP \
+				lpdest++; \
+				lzi += r_zistepx; \
+				lpz++; \
+				llight += r_lstepx; \
+				lptex += a_ststepxwhole; \
+				lsfrac += a_sstepxfrac; \
+				lptex += lsfrac >> 16; \
+				lsfrac &= 0xFFFF; \
+				ltfrac += a_tstepxfrac; \
+				if (ltfrac & 0x10000) \
+				{ \
+					lptex += r_affinetridesc.skinwidth; \
+					ltfrac &= 0xFFFF; \
+				}
+
+#define SPANLOOP_END \
+			} while (--lcount); \
+		} \
+		pspanpackage++; \
+	} while (pspanpackage->count != -999999);
+
+#define SPANLOOP_VARS \
+	int				lcount, lsfrac, ltfrac, llight, lzi; \
+	unsigned short	*lpdest; \
+	byte			*lptex; \
+	short			*lpz;
+
+#if Q2_ASM
+// r_polyse060rgb.s draws the normal case and comes here for the IR goggles
+#define R_PolysetDrawSpansRGB_Opaque R_PolysetDrawSpansRGB_OpaqueC
+#endif
+void R_PolysetDrawSpansRGB_Opaque (spanpackage_t *pspanpackage)
+{
+	SPANLOOP_VARS
+	qboolean	ir = (r_newrefdef.rdflags & RDF_IRGOGGLES) && (currententity->flags & RF_IR_VISIBLE);
+
+	SPANLOOP_BEGIN
+				Q2C_ADD (Q2C_POLY_PIXELS, 1);
+				if ((lzi >> 16) >= *lpz)
+				{
+					if (ir)
+						*lpdest = vid.colormap16[irtable[*lptex]];
+					else
+						*lpdest = vid.colormap16[*lptex + (llight & 0xFF00)];
+					*lpz = lzi >> 16;
+				}
+	SPANLOOP_STEP
+	SPANLOOP_END
+}
+
+#if Q2_ASM
+#undef R_PolysetDrawSpansRGB_Opaque
+#endif
+
+void R_PolysetDrawSpansRGB_33 (spanpackage_t *pspanpackage)
+{
+	SPANLOOP_VARS
+
+	SPANLOOP_BEGIN
+				if ((lzi >> 16) >= *lpz)
+				{
+					unsigned	temp = vid.colormap16[*lptex + (llight & 0xFF00)];
+
+					*lpdest = RGB_BLEND33 (temp, *lpdest);
+				}
+	SPANLOOP_STEP
+	SPANLOOP_END
+}
+
+void R_PolysetDrawSpansRGB_66 (spanpackage_t *pspanpackage)
+{
+	SPANLOOP_VARS
+
+	SPANLOOP_BEGIN
+				if ((lzi >> 16) >= *lpz)
+				{
+					unsigned	temp = vid.colormap16[*lptex + (llight & 0xFF00)];
+
+					*lpdest = RGB_BLEND66 (temp, *lpdest);
+					*lpz = lzi >> 16;
+				}
+	SPANLOOP_STEP
+	SPANLOOP_END
+}
+
+void R_PolysetDrawSpansConstantRGB_33 (spanpackage_t *pspanpackage)
+{
+	SPANLOOP_VARS
+	unsigned	color = d_8to16table[r_aliasblendcolor & 0xFF];
+
+	SPANLOOP_BEGIN
+				if ((lzi >> 16) >= *lpz)
+					*lpdest = RGB_BLEND33 (color, *lpdest);
+	SPANLOOP_STEP
+	SPANLOOP_END
+}
+
+void R_PolysetDrawSpansConstantRGB_66 (spanpackage_t *pspanpackage)
+{
+	SPANLOOP_VARS
+	unsigned	color = d_8to16table[r_aliasblendcolor & 0xFF];
+
+	SPANLOOP_BEGIN
+				if ((lzi >> 16) >= *lpz)
+					*lpdest = RGB_BLEND66 (color, *lpdest);
+	SPANLOOP_STEP
+	SPANLOOP_END
+}
+
 /*
 ================
 R_PolysetFillSpans8
