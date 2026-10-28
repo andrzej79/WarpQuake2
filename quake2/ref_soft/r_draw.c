@@ -32,7 +32,43 @@ image_t		*draw_chars;				// 8*8 graphic characters
 Draw_FindPic
 ================
 */
+image_t *Draw_FindPicUncached (char *name);
+
 image_t *Draw_FindPic (char *name)
+{
+	image_t	*image;
+
+	// WarpQuake: the HUD asks for the same few pictures every frame, and
+	// R_FindImage compared the name with every image's.  A hit here is what
+	// a hit there is: the same image, marked used in this registration
+	// (so it is not freed); entries count only within the registration
+	// they were made in.
+#define PICCACHE_SIZE 32
+	static struct { char name[MAX_QPATH]; image_t *image; int sequence; } piccache[PICCACHE_SIZE];
+	static int piccache_next;
+	int		i;
+
+	for (i = 0 ; i < PICCACHE_SIZE ; i++)
+	{
+		if (piccache[i].image && piccache[i].sequence == registration_sequence &&
+			!strcmp (piccache[i].name, name))
+		{
+			piccache[i].image->registration_sequence = registration_sequence;
+			return piccache[i].image;
+		}
+	}
+	image = Draw_FindPicUncached (name);
+	if (image && strlen (name) < MAX_QPATH)
+	{
+		i = piccache_next++ % PICCACHE_SIZE;
+		strcpy (piccache[i].name, name);
+		piccache[i].image = image;
+		piccache[i].sequence = registration_sequence;
+	}
+	return image;
+}
+
+image_t *Draw_FindPicUncached (char *name)
 {
 	image_t	*image;
 	char	fullname[MAX_QPATH];

@@ -944,7 +944,8 @@ static qboolean R_AliasSetupSkin (void)
 	r_affinetridesc.skinwidth = pskindesc->width;
 	r_affinetridesc.skinheight = pskindesc->height;
 
-	R_PolysetUpdateTables ();		// FIXME: precalc edge lookups
+	// WarpQuake: R_PolysetUpdateTables only filled skintable[], which nothing
+	// in Quake II reads (its reader was Quake's recursive triangle drawer)
 
 	return true;
 }
