@@ -119,6 +119,10 @@ mode); the ring is mono when the mode is, so Quake II writes half as much. `s_kh
 default 11) is the rate: 11, 22 or 44 kHz. Both take effect at `snd_restart`. At the defaults
 sound costs about 1.8 ms a frame (1.0 in Quake II's mixer, the rest in AHI's).
 
+Engine bug fixed here: id's C mixer took the volume row of its scale table as `vol >> 11`
+(always row 0, all zeros) where its x86 code used `vol >> 3`, so every 8-bit sound - all of
+them, at the default `s_loadas8bit 1` - was silent (`snd_mix.c`).
+
 A timedemo:
 
 ```

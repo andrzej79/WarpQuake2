@@ -378,12 +378,21 @@ void S_PaintChannelFrom8 (channel_t *ch, sfxcache_t *sc, int count, int offset)
 	if (ch->rightvol > 255)
 		ch->rightvol = 255;
 		
-	lscale = snd_scaletable[ ch->leftvol >> 11];
-	rscale = snd_scaletable[ ch->rightvol >> 11];
+	// WarpQuake2: >> 3, the row of snd_scaletable for the volume (id's x86
+	// code: (vol & 0xF8) << 7 bytes); the C had >> 11, row 0, all zeros, so
+	// every 8-bit sound (s_loadas8bit 1, the default) was silent
+	lscale = snd_scaletable[ ch->leftvol >> 3];
+	rscale = snd_scaletable[ ch->rightvol >> 3];
 	sfx = (signed char *)sc->data + ch->pos;
 
 	samp = &paintbuffer[offset];
 
+	if (dma.channels == 1)
+	{	// WarpQuake2: a mono ring takes the left channel only (S_TransferPaintBuffer)
+		for (i=0 ; i<count ; i++, samp++)
+			samp->left += lscale[sfx[i]];
+	}
+	else
 	for (i=0 ; i<count ; i++, samp++)
 	{
 		data = sfx[i];
