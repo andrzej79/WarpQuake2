@@ -18,6 +18,7 @@
 //   -crc            CRC-32 of every frame shown (needs +set fixedtime 100)
 //   -crcfile <f>    ... one line per frame into f
 //   -crcdump <n>[,<n>...]  those frames as raw 8-bit pixels to RAM:frame<n>_<w>x<h>.raw
+//   -crcdumpdir <d> where those go instead of RAM: (vamos has none: work:)
 //   -crcref <f>     dump the first frame whose CRC differs from a -crcfile f
 //   -sample         the sampling profiler over the timedemo (RAM:WarpQuake2.wprf)
 //   -proflog <f>    where the report goes (RAM:WarpQuake2_prof.txt)

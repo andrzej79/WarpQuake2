@@ -91,6 +91,8 @@ static void CRCInit(void)
   }
 }
 
+static const char *ArgValue(const char *name, const char *def);
+
 static unsigned long CRCUpdate(unsigned long crc, const unsigned char *p, int n)
 {
   while(n-- > 0) {
@@ -108,7 +110,7 @@ void Q2P_InputCRC(int kind, const void *data, int bytes)
   for(i = 0; i < numDumps && crcDump[i] != crcFrames + 1; i++) {
   }
   if(measuring && i < numDumps) {
-    FILE *f = fopen(va("RAM:in%lu_%d.bin", crcFrames + 1, kind), "ab");
+    FILE *f = fopen(va("%sin%lu_%d.bin", ArgValue("-crcdumpdir", "RAM:"), crcFrames + 1, kind), "ab");
 
     if(f) {
       fwrite(data, 1, bytes, f);
@@ -164,7 +166,7 @@ void Q2P_FrameCRC(const unsigned char *buf, int width, int height, int rowbytes)
   for(y = 0; y < numDumps && crcDump[y] != crcFrames; y++) {
   }
   if(y < numDumps) {
-    FILE *f = fopen(va("RAM:frame%lu_%dx%d.raw", crcFrames, width, height), "wb");
+    FILE *f = fopen(va("%sframe%lu_%dx%d.raw", ArgValue("-crcdumpdir", "RAM:"), crcFrames, width, height), "wb");
 
     if(f) {
       for(y = 0; y < height; y++) {

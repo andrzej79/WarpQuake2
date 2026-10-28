@@ -399,6 +399,7 @@ D_DrawSpans16
   FIXME: actually make this subdivide by 16 instead of 8!!!
 =============
 */
+#if !Q2_ASM	// r_scan060.s
 void D_DrawSpans16 (espan_t *pspan)
 {
 	int				count, spancount;
@@ -422,8 +423,7 @@ void D_DrawSpans16 (espan_t *pspan)
 				(r_screenwidth * pspan->v) + pspan->u);
 
 		count = pspan->count;
-		Q2C_ADD (Q2C_SPAN_PIXELS, count);
-		Q2C_ADD (Q2C_SPANS, 1);
+		Q2C_ADD (Q2C_SPAN_PIXELS, count);	// (the asm also counts spans)
 
 	// calculate the initial s/z, t/z, 1/z, s, and t and clamp
 		du = (float)pspan->u;
@@ -528,6 +528,7 @@ void D_DrawSpans16 (espan_t *pspan)
 
 	} while ((pspan = pspan->pnext) != NULL);
 }
+#endif
 
 #endif
 

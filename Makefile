@@ -16,8 +16,11 @@ MATHLIB     := $(if $(filter 68040,$(CPU)),-lm040,-lm060)
 # -O1, not -O2: vbcc 0.9h miscompiles some loops at -O2 (WarpQuake found it:
 # a loop index stepped in the body together with a break).
 OPT         ?= 1
-OBJ_DIR     := $(BUILD_DIR)/obj-$(CPU)-O$(OPT)
-SUFFIX      := $(if $(filter 68040,$(CPU)),_040)$(if $(filter-out 1,$(OPT)),_O$(OPT))
+# ASM=1: the 68060 routines in quake2/ref_soft/*.s replace their C versions
+# (Q2_ASM in the C).  ASM=0 is the all-C reference, for CRC comparisons.
+ASM         ?= 1
+OBJ_DIR     := $(BUILD_DIR)/obj-$(CPU)-O$(OPT)$(if $(filter 0,$(ASM)),-C)
+SUFFIX      := $(if $(filter 68040,$(CPU)),_040)$(if $(filter-out 1,$(OPT)),_O$(OPT))$(if $(filter 0,$(ASM)),_C)
 BIN         := $(BUILD_DIR)/$(TARGET)$(SUFFIX)
 
 # ---- SDK / Includes ----
@@ -32,7 +35,7 @@ VBCC        ?= $(SDK_DIR)/vbcc
 # repo is checked out next to them.
 P96_SDK     ?= ../csWarpAmigaSoftware/p96_gfx_driver/Picasso96Develop/Include
 # AMIGA: the few engine changes that are AmigaOS-specific (the base directory).
-DEF_FLAGS   := -DAMIGA -DGAME_HARD_LINKED -DREF_HARD_LINKED $(addprefix -D,$(DEFINES))
+DEF_FLAGS   := -DAMIGA -DGAME_HARD_LINKED -DREF_HARD_LINKED -DQ2_ASM=$(ASM) $(addprefix -D,$(DEFINES))
 
 # ---- Toolchain ----
 CC      := vc
@@ -45,7 +48,7 @@ OPTFLAG := -O$(OPT)
 CFLAGS  = +aos68k_std -cpu=$(CPU) -fpu=$(CPU) -c99 $(OPTFLAG) -dontwarn=153 -dontwarn=214 -dontwarn=208 -dontwarn=81
 LIBS    := -lamiga -ldebug $(MATHLIB)
 LDFLAGS := $(LIBS)
-ASFLAGS := -quiet -Fhunk -m68060
+ASFLAGS := -quiet -Fhunk -m68060 -Iquake2/ref_soft
 
 # ---- Sources ----
 # id's engine, less what another platform layer or a DLL build would bring:
@@ -55,6 +58,8 @@ ENGINE_DIRS := client qcommon server ref_soft game
 ENGINE_SRC  := $(filter-out quake2/client/x86.c quake2/server/sv_null.c,$(foreach d,$(ENGINE_DIRS),$(wildcard quake2/$(d)/*.c))) \
                quake2/null/cd_null.c quake2/null/snddma_null.c
 ENGINE_OBJS := $(patsubst quake2/%.c,$(OBJ_DIR)/quake2/%.o,$(ENGINE_SRC))
+ENGINE_ASM  := $(if $(filter 1,$(ASM)),$(wildcard quake2/ref_soft/*.s))
+ENGINE_OBJS += $(patsubst quake2/%.s,$(OBJ_DIR)/quake2/%.o,$(ENGINE_ASM))
 APP_SRC     := $(wildcard src/*.c)
 APP_OBJS    := $(patsubst src/%.c,$(OBJ_DIR)/src/%.o,$(APP_SRC))
 APP_OBJS    += $(patsubst src/%.s,$(OBJ_DIR)/src/%.o,$(wildcard src/*.s))
@@ -83,6 +88,11 @@ $(OBJ_DIR)/quake2/%.o: quake2/%.c $(ENGINE_HDRS) $(wildcard src/q2prof.h src/ami
 	@$(MKDIR) $(@D)
 	@echo "  CC $<"
 	@$(CC) $(CFLAGS) $(DEF_FLAGS) -c $< -o $@ > $@.log 2>&1 || { cat $@.log; exit 1; }
+
+$(OBJ_DIR)/quake2/%.o: quake2/%.s
+	@$(MKDIR) $(@D)
+	@echo "  AS $<"
+	@$(AS) $(ASFLAGS) -o $@ $< > $@.log 2>&1 || { cat $@.log; exit 1; }
 
 $(OBJ_DIR)/src/%.o: src/%.s
 	@$(MKDIR) $(@D)
