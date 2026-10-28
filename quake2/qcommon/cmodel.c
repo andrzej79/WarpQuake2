@@ -1720,7 +1720,12 @@ Writes the portal state to a savegame file
 */
 void	CM_WritePortalState (FILE *f)
 {
-	fwrite (portalopen, sizeof(portalopen), 1, f);
+	// WarpQuake2: big-endian, as the game's saves, so either CPU reads them
+	int		i, v[MAX_MAP_AREAPORTALS];
+
+	for (i=0 ; i<MAX_MAP_AREAPORTALS ; i++)
+		v[i] = BigLong (portalopen[i]);
+	fwrite (v, sizeof(v), 1, f);
 }
 
 /*
@@ -1733,7 +1738,11 @@ and recalculates the area connections
 */
 void	CM_ReadPortalState (FILE *f)
 {
-	FS_Read (portalopen, sizeof(portalopen), f);
+	int		i, v[MAX_MAP_AREAPORTALS];
+
+	FS_Read (v, sizeof(v), f);
+	for (i=0 ; i<MAX_MAP_AREAPORTALS ; i++)
+		portalopen[i] = BigLong (v[i]) != 0;
 	FloodAreaConnections ();
 }
 

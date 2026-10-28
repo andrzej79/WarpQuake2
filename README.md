@@ -143,7 +143,16 @@ each sound at its file's sample width and channels, though it stores mono, one b
 at `s_loadas8bit 1`: half of every 16-bit sound was never used, 3.6 MB at 22 kHz in base1
 (`snd_mem.c`).
 
-A timedemo:
+**Savegames** are written field by field, big-endian, with function pointers and monster
+moves by name (`game/g_save.c`), so a save loads in any later build and on any CPU. id's
+wrote each struct as the compiler laid it out and a function as its offset from `InitGame`,
+checked only against the build date: a save from an earlier build of the same day jumped
+into the wrong code. The name table, `game/g_savetab.c`, is generated from the game's sources
+by `tools/gen_savetab.py` - run it after adding or renaming a game function or monster move
+(`--check` says whether it is current). Saves from before this format are refused with a
+message.
+
+A timedemo (in the console: `timedemo 1`, then `demomap demo1.dm2`):
 
 ```
 WarpQuake2 +set sw_mode 0 +set timedemo 1 +demomap demo1.dm2
@@ -204,7 +213,8 @@ Engine bugs fixed on the way: an instant particle's time was read uninitialised
   the drawers again with `PIX16`. The changes: what vbcc needs (field offsets with `offsetof`, linkage
   that matches its declarations, `strdup`/`putenv` declared), the base directory joined
   without a `/` after a `:` (`PROGDIR:baseq2`), the game's `maxclients` and `dedicated`
-  renamed apart from the engine's, the instrumentation hooks, and the renderer work above.
+  renamed apart from the engine's, the instrumentation hooks, the portable savegames, and
+  the renderer work above.
   `quake2/ref_soft/*060.s` are the 68060 routines; `Q2_ASM` (the Makefile's `ASM`) chooses
   them over the C.
 - `src/` - the AmigaOS platform layer. `amiga_os.c`, `amiga_screen.c`, `amiga_input.c`,
