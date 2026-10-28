@@ -107,7 +107,8 @@ typedef struct {
 	int		remainder;
 } adivtab_t;
 
-static adivtab_t	adivtab[32*32] = {
+// not static: r_raster060.s reads it too
+adivtab_t	adivtab[32*32] = {
 #include "adivtab.h"
 };
 
@@ -202,6 +203,7 @@ void R_PolysetUpdateTables (void)
 R_DrawTriangle
 ================
 */
+#if !Q2_ASM	// r_raster060.s
 void R_DrawTriangle( void )
 {
 	spanpackage_t spans[DPS_MAXSPANS];
@@ -257,6 +259,7 @@ void R_DrawTriangle( void )
 		R_RasterizeAliasPolySmooth ();
 	}
 }
+#endif
 
 
 /*
@@ -374,6 +377,7 @@ void FloorDivMod (float numer, float denom, int *quotient,
 R_PolysetSetUpForLineScan
 ====================
 */
+#if !Q2_ASM	// r_raster060.s
 void R_PolysetSetUpForLineScan(fixed8_t startvertu, fixed8_t startvertv,
 		fixed8_t endvertu, fixed8_t endvertv)
 {
@@ -406,6 +410,7 @@ void R_PolysetSetUpForLineScan(fixed8_t startvertu, fixed8_t startvertv,
 		erroradjustdown = dn;
 	}
 }
+#endif
 
 
 
@@ -673,6 +678,7 @@ done_with_steps:
 	__asm mov a_ststepxwhole, eax
 }
 #else
+#if !Q2_ASM	// r_raster060.s
 void R_PolysetCalcGradients (int skinwidth)
 {
 	float	xstepdenominv, ystepdenominv, t0, t1;
@@ -736,6 +742,7 @@ void R_PolysetCalcGradients (int skinwidth)
 
 	a_ststepxwhole = skinwidth * (r_tstepx >> 16) + (r_sstepx >> 16);
 }
+#endif
 #endif
 
 /*
@@ -1162,6 +1169,7 @@ void R_PolysetFillSpans8 (spanpackage_t *pspanpackage)
 R_RasterizeAliasPolySmooth
 ================
 */
+#if !Q2_ASM	// r_raster060.s
 void R_RasterizeAliasPolySmooth (void)
 {
 	int				initialleftheight, initialrightheight;
@@ -1487,6 +1495,7 @@ void R_RasterizeAliasPolySmooth (void)
 		(*d_pdrawspans) (pstart);
 	}
 }
+#endif
 
 
 /*
@@ -1494,6 +1503,7 @@ void R_RasterizeAliasPolySmooth (void)
 R_PolysetSetEdgeTable
 ================
 */
+#if !Q2_ASM	// r_raster060.s
 void R_PolysetSetEdgeTable (void)
 {
 	int			edgetableindex;
@@ -1549,5 +1559,6 @@ void R_PolysetSetEdgeTable (void)
 
 	pedgetable = &edgetables[edgetableindex];
 }
+#endif
 
 
