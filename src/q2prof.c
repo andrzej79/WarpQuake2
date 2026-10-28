@@ -283,7 +283,10 @@ static void Report(const char *logpath)
   Out(f, "water/lava pixels   %8.0f\n", (double)q2c_count[Q2C_TURB_PIXELS] / frames);
   Out(f, "alias span pixels   %8.0f  (tested against z; not all are written)\n",
       (double)q2c_count[Q2C_POLY_PIXELS] / frames);
-  Out(f, "alias models        %8.1f\n", (double)q2c_count[Q2C_ALIAS_MODELS] / frames);
+  Out(f, "alias models        %8.1f, %.0f vertices, %.0f triangles: %.0f drawn unclipped, %.0f clipped\n",
+      (double)q2c_count[Q2C_ALIAS_MODELS] / frames, (double)q2c_count[Q2C_ALIAS_VERTS] / frames,
+      (double)q2c_count[Q2C_ALIAS_TRIS] / frames, (double)q2c_count[Q2C_ALIAS_DRAWN] / frames,
+      (double)q2c_count[Q2C_ALIAS_CLIPPED] / frames);
   Out(f, "surface cache       %8.1f blocks, %.1f KB built\n", (double)q2c_count[Q2C_CACHE_BUILDS] / frames,
       q2c_count[Q2C_CACHE_BYTES] / 1024.0 / frames);
   Out(f, "particles           %8.1f\n", (double)q2c_count[Q2C_PARTICLES] / frames);

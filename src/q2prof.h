@@ -63,6 +63,10 @@ typedef enum {
   Q2C_CACHE_BYTES,  // ... and their size
   Q2C_PARTICLES,    // particles drawn
   Q2C_ALIAS_MODELS, // alias models drawn
+  Q2C_ALIAS_VERTS,  // ... their vertices transformed
+  Q2C_ALIAS_TRIS,   // ... their triangles not completely clipped
+  Q2C_ALIAS_DRAWN,  // ... of those, unclipped and front-facing (to R_DrawTriangle)
+  Q2C_ALIAS_CLIPPED,// ... and partly clipped (to R_AliasClipTriangle)
   Q2C_COUNT
 } q2p_counter_t;
 

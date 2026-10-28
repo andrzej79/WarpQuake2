@@ -281,6 +281,7 @@ void R_AliasPreparePoints (void)
 	pfinalverts = (finalvert_t *)
 			(((long)&finalverts[0] + CACHE_SIZE - 1) & ~(CACHE_SIZE - 1));
 
+	Q2C_ADD (Q2C_ALIAS_VERTS, s_pmdl->num_xyz);
 	aliasbatchedtransformdata.num_points = s_pmdl->num_xyz;
 	aliasbatchedtransformdata.last_verts = r_lastframe->verts;
 	aliasbatchedtransformdata.this_verts = r_thisframe->verts;
@@ -306,6 +307,7 @@ void R_AliasPreparePoints (void)
 
 			if ( pfv[0]->flags & pfv[1]->flags & pfv[2]->flags )
 				continue;		// completely clipped
+			Q2C_ADD (Q2C_ALIAS_TRIS, 1);
 
 			// WarpQuake: an unclipped triangle that R_DrawTriangle would not
 			// draw (back-facing, or with a zero-length edge: d_xdenom >= 0)
@@ -331,10 +333,12 @@ void R_AliasPreparePoints (void)
 				aliastriangleparms.b = pfv[1];
 				aliastriangleparms.c = pfv[0];
 
+				Q2C_ADD (Q2C_ALIAS_DRAWN, 1);
 				R_DrawTriangle();
 			}
 			else
 			{
+				Q2C_ADD (Q2C_ALIAS_CLIPPED, 1);
 				R_AliasClipTriangle (pfv[2], pfv[1], pfv[0]);
 			}
 		}
@@ -349,6 +353,7 @@ void R_AliasPreparePoints (void)
 
 			if ( pfv[0]->flags & pfv[1]->flags & pfv[2]->flags )
 				continue;		// completely clipped
+			Q2C_ADD (Q2C_ALIAS_TRIS, 1);
 
 			// WarpQuake: an unclipped triangle that R_DrawTriangle would not
 			// draw (back-facing, or with a zero-length edge: d_xdenom >= 0)
@@ -374,10 +379,12 @@ void R_AliasPreparePoints (void)
 				aliastriangleparms.b = pfv[1];
 				aliastriangleparms.c = pfv[2];
 
+				Q2C_ADD (Q2C_ALIAS_DRAWN, 1);
 				R_DrawTriangle();
 			}
 			else		
 			{	// partially clipped
+				Q2C_ADD (Q2C_ALIAS_CLIPPED, 1);
 				R_AliasClipTriangle (pfv[0], pfv[1], pfv[2]);
 			}
 		}

@@ -440,6 +440,43 @@ V_RenderView
 
 ==================
 */
+/*
+====================
+V_SortEntities
+
+WarpQuake: r_entities by model, then skin (entitycmpfnc's order), stable:
+equal ones keep the order they were added in.
+====================
+*/
+static void V_SortEntities (void)
+{
+	static entity_t	sorted[MAX_ENTITIES];
+	static int		order[MAX_ENTITIES];
+	int				i, j, k;
+
+	for (i = 0 ; i < r_numentities ; i++)
+	{
+		entity_t	*e = &r_entities[i];
+
+		for (j = i ; j > 0 ; j--)
+		{
+			entity_t	*o = &r_entities[order[j-1]];
+
+			if (o->model < e->model || (o->model == e->model && o->skin <= e->skin))
+				break;
+			order[j] = order[j-1];
+		}
+		order[j] = i;
+	}
+	for (k = 0 ; k < r_numentities && order[k] == k ; k++)
+		;
+	if (k == r_numentities)
+		return;		// already in order
+	for (i = 0 ; i < r_numentities ; i++)
+		sorted[i] = r_entities[order[i]];
+	memcpy (r_entities, sorted, r_numentities * sizeof(entity_t));
+}
+
 void V_RenderView( float stereo_separation )
 {
 	extern int entitycmpfnc( const entity_t *, const entity_t * );
@@ -537,7 +574,9 @@ void V_RenderView( float stereo_separation )
 		cl.refdef.rdflags = cl.frame.playerstate.rdflags;
 
 		// sort entities for better cache locality
-        qsort( cl.refdef.entities, cl.refdef.num_entities, sizeof( cl.refdef.entities[0] ), (int (*)(const void *, const void *))entitycmpfnc );
+		// WarpQuake: a stable insertion sort of indexes, then one gather;
+		// vbcc's qsort swapped the 72-byte entities byte by byte
+		V_SortEntities ();
 	}
 
 	if (q2p_crcon)
