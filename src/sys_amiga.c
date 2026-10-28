@@ -279,16 +279,15 @@ MAIN
 
 int main(int argc, char **argv)
 {
-  static char *wbArgv[] = {"WarpQuake2", NULL};
   int time, oldtime, newtime;
 
   (void)stackCookie;
   (void)versionTag;
 
-  // Workbench start: argc 0 and argv is the WBStartup message
+  // Workbench start: argc 0 and argv is the WBStartup message; the command
+  // line is the icon's tooltypes then
   if(argc == 0) {
-    argc = 1;
-    argv = wbArgv;
+    argc = qaWorkbenchArgs(&argv);
   }
   atexit(qaShutdown);
   {

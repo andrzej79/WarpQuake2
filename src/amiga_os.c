@@ -17,7 +17,10 @@
 #include <dos/dosextens.h>
 #include <dos/var.h>
 #include <intuition/intuition.h>
+#include <workbench/startup.h>
+#include <workbench/workbench.h>
 #include <proto/exec.h>
+#include <proto/icon.h>
 #include <proto/dos.h>
 #include <proto/intuition.h>
 #include <proto/timer.h>
@@ -26,6 +29,7 @@
 #include "q2sample.h"
 
 struct IntuitionBase *IntuitionBase = NULL;
+struct Library *IconBase = NULL;
 struct Device *TimerBase = NULL;
 
 static struct MsgPort *timerPort = NULL;
@@ -141,6 +145,52 @@ void qaShutdown(void)
 int qaFromWorkbench(void)
 {
   return fromWorkbench;
+}
+
+// A Workbench start's command line: the program's name, then every tooltype
+// of its icon that starts with - or + (+set vid_bpp 16), split at the
+// spaces; "(+set vid_bpp 16)" is a tooltype switched off, as Workbench has it.
+int qaWorkbenchArgs(char ***argvp)
+{
+  extern struct WBStartup *_WBenchMsg;
+  static char *args[64];
+  struct DiskObject *icon;
+  BPTR old;
+  int argc = 0;
+
+  args[argc++] = "WarpQuake2";
+  if(_WBenchMsg != NULL && _WBenchMsg->sm_NumArgs > 0 && (IconBase = OpenLibrary("icon.library", 36)) != NULL) {
+    struct WBArg *wa = &_WBenchMsg->sm_ArgList[0];
+
+    old = CurrentDir(wa->wa_Lock);
+    icon = GetDiskObject(wa->wa_Name);
+    CurrentDir(old);
+    if(icon != NULL) {
+      char **tt;
+
+      for(tt = (char **)icon->do_ToolTypes; tt != NULL && *tt != NULL; tt++) {
+        char *copy, *word;
+
+        if((*tt)[0] != '-' && (*tt)[0] != '+') {
+          continue;
+        }
+        copy = malloc(strlen(*tt) + 1);
+        if(copy == NULL) {
+          break;
+        }
+        strcpy(copy, *tt);
+        for(word = strtok(copy, " \t"); word != NULL && argc < 63; word = strtok(NULL, " \t")) {
+          args[argc++] = word;
+        }
+      }
+      FreeDiskObject(icon);
+    }
+    CloseLibrary(IconBase);
+    IconBase = NULL;
+  }
+  args[argc] = NULL;
+  *argvp = args;
+  return argc;
 }
 
 void qaMkdir(const char *path)

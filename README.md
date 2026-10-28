@@ -101,6 +101,10 @@ installation and keep its own settings in a game directory of their own:
 WarpQuake2 +set basedir Work:Games/Quake2 +set game warpq2
 ```
 
+From Workbench, the icon's tooltypes that start with `-` or `+` are the command line, split at
+the spaces: a tooltype `+set basedir Work:Games/Quake2` does the same as the first half above.
+A tooltype in parentheses is switched off.
+
 **Video options** (Options, Video): the mode, the colour depth, the screen size, the
 brightness and the HUD bar, set on "apply". The modes are id's `sw_mode` 0-4 (320x240,
 400x300, 512x384, 640x480, 800x600) and 5, 640x360; nothing larger, which a 68060 cannot render

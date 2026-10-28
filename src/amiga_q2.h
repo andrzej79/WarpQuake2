@@ -13,6 +13,7 @@
 int qaInit(int headless);              // libraries and timer; 0 on failure (message printed)
 void qaShutdown(void);                 // also the atexit() cleanup: safe to call twice
 int qaFromWorkbench(void);
+int qaWorkbenchArgs(char ***argvp);     // the icon's - and + tooltypes as a command line
 unsigned qaMilliseconds(void);         // since qaInit()
 unsigned long qaTicks(void);           // raw E-clock count, low word
 unsigned long qaTickRate(void);        // E-clock ticks per second
