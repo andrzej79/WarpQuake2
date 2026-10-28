@@ -40,7 +40,12 @@ void SWimp_EndFrame(void)
   }
   {
     Q2P_BEGIN(Q2P_BLIT);
-    qaScreenBlit(vid.buffer, vid.rowbytes, vid.width, vid.height);
+    static cvar_t *vid_blit;
+
+    if(vid_blit == NULL) {
+      vid_blit = ri.Cvar_Get("vid_blit", "0", CVAR_ARCHIVE);
+    }
+    qaScreenBlit(vid.buffer, vid.rowbytes, vid.width, vid.height, (int)vid_blit->value);
     Q2P_END(Q2P_BLIT);
   }
 }

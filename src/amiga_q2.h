@@ -45,7 +45,9 @@ void qaScreenClose(void);
 void qaScreenShutdown(void);                // the screen and the libraries, at exit
 int qaScreenWidth(void);                   // the open screen's (may exceed the frame's)
 int qaScreenHeight(void);
-void qaScreenBlit(const unsigned char *pixels, int rowBytes, int width, int height);
+// mode 0: WriteChunkyPixels; 1: the bitmap locked and the rows copied with
+// CopyMemQuick (falls back to 0 if it cannot be locked)
+void qaScreenBlit(const unsigned char *pixels, int rowBytes, int width, int height, int mode);
 void qaScreenPalette(const unsigned char *rgba);  // 256 entries of R, G, B, unused
 const char *qaScreenInfo(void);
 

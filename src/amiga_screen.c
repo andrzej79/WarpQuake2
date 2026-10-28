@@ -137,7 +137,43 @@ const char *qaScreenInfo(void)
   return info;
 }
 
-void qaScreenBlit(const unsigned char *pixels, int rowBytes, int width, int height)
+// Straight into the screen's memory, row by row.  FALSE if the bitmap cannot
+// be locked or is not CLUT: the caller falls back to the OS call.
+static BOOL blitLocked(const UBYTE *src, int rowBytes, int width, int height)
+{
+  struct BitMap *bm = qaWindow->RPort->BitMap;
+  struct RenderInfo ri;
+  LONG lock;
+  UBYTE *dst;
+  int y;
+
+  lock = p96LockBitMap(bm, (UBYTE *)&ri, sizeof(ri));
+  if(lock == 0) {
+    return FALSE;
+  }
+  if(ri.RGBFormat != RGBFB_CLUT || ri.Memory == NULL) {
+    p96UnlockBitMap(bm, lock);
+    return FALSE;
+  }
+  dst = (UBYTE *)ri.Memory;
+  if((((ULONG)src | (ULONG)dst | (ULONG)rowBytes | (ULONG)ri.BytesPerRow | (ULONG)width) & 3) == 0) {
+    for(y = 0; y < height; y++) {
+      CopyMemQuick((APTR)src, dst, width);
+      src += rowBytes;
+      dst += ri.BytesPerRow;
+    }
+  } else {
+    for(y = 0; y < height; y++) {
+      CopyMem((APTR)src, dst, width);
+      src += rowBytes;
+      dst += ri.BytesPerRow;
+    }
+  }
+  p96UnlockBitMap(bm, lock);
+  return TRUE;
+}
+
+void qaScreenBlit(const unsigned char *pixels, int rowBytes, int width, int height, int mode)
 {
   if(qaWindow == NULL) {
     return;
@@ -147,6 +183,9 @@ void qaScreenBlit(const unsigned char *pixels, int rowBytes, int width, int heig
   }
   if(height > screenHeight) {
     height = screenHeight;
+  }
+  if(mode == 1 && blitLocked(pixels, rowBytes, width, height)) {
+    return;
   }
   WriteChunkyPixels(qaWindow->RPort, 0, 0, width - 1, height - 1, (UBYTE *)pixels, rowBytes);
 }
