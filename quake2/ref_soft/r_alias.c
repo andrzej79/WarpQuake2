@@ -297,6 +297,16 @@ void R_AliasPreparePoints (void)
 	pstverts = (dstvert_t *)((byte *)s_pmdl + s_pmdl->ofs_st);
 	ptri = (dtriangle_t *)((byte *)s_pmdl + s_pmdl->ofs_tris);
 
+#if Q2_ASM
+	{
+		// r_alias060.s: the two loops below as one
+		extern void R_AliasDrawTriangles (finalvert_t *fv, dtriangle_t *ptri, dstvert_t *pstverts,
+										  int numtris, int mirrored);
+
+		R_AliasDrawTriangles (pfinalverts, ptri, pstverts, s_pmdl->num_tris,
+							  ( currententity->flags & RF_WEAPONMODEL ) && ( r_lefthand->value == 1.0F ));
+	}
+#else
 	if ( ( currententity->flags & RF_WEAPONMODEL ) && ( r_lefthand->value == 1.0F ) )
 	{
 		for (i=0 ; i<s_pmdl->num_tris ; i++, ptri++)
@@ -389,6 +399,7 @@ void R_AliasPreparePoints (void)
 			}
 		}
 	}
+#endif
 }
 
 
