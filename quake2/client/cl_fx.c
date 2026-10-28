@@ -115,9 +115,20 @@ void CL_AddLightStyles (void)
 {
 	int		i;
 	clightstyle_t	*ls;
+	// WarpQuake: V_AddLightStyle's work inline (it was 256 calls a frame,
+	// each with its range check)
+	extern lightstyle_t	r_lightstyles[MAX_LIGHTSTYLES];
+	lightstyle_t	*out;
 
-	for (i=0,ls=cl_lightstyle ; i<MAX_LIGHTSTYLES ; i++, ls++)
-		V_AddLightStyle (i, ls->value[0], ls->value[1], ls->value[2]);
+	for (i=0,ls=cl_lightstyle,out=r_lightstyles ; i<MAX_LIGHTSTYLES ; i++, ls++, out++)
+	{
+		float	r = ls->value[0], g = ls->value[1], b = ls->value[2];
+
+		out->white = r+g+b;
+		out->rgb[0] = r;
+		out->rgb[1] = g;
+		out->rgb[2] = b;
+	}
 }
 
 /*
