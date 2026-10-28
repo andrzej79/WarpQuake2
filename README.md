@@ -23,7 +23,8 @@ your own `baseq2/pak*.pak` next to the program.
 
 ## Speed
 
-`timedemo demo1`, 320x240x8, 68060 at 104 MHz (Warp1260X, L2 early read ack on), no sound:
+`timedemo demo1`, 320x240x8, 68060 at 104 MHz (Warp1260X, L2 early read ack on), no sound
+(the default sound, below, adds about 1.8 ms a frame):
 
 | build | ms/frame | fps |
 |---|---:|---:|
@@ -80,8 +81,9 @@ make ftp            # upload to WORK:Games/WarpQuake2 (AMIGA_FTP_HOST/USER/PASSW
 ```
 
 vbcc, `-cpu=68060 -fpu=68060 -O1` with `-lm060`, as WarpQuake (vbcc 0.9h miscompiles some loops
-at -O2), and vasm. It needs vbcc and vasm on the PATH, the AmigaOS 3.2 NDK (`NDK_INC_C`) and the
-Picasso96 developer headers (`P96_SDK`), all overridable on the `make` command line.
+at -O2), and vasm. It needs vbcc and vasm on the PATH, the AmigaOS 3.2 NDK (`NDK_INC_C`), the
+Picasso96 developer headers (`P96_SDK`) and AHI's (`AHI_SDK`, the ahidev archive), all
+overridable on the `make` command line.
 
 ## Running
 
@@ -110,6 +112,13 @@ same with MOVE16 bursts. `-1`, the default, is `2` on a Warp board (its RTG memo
 and built for bursts: 1.46 ms a 320x240x8 frame against WriteChunkyPixels' 2.41) and `0` on any
 other, since MOVE16 into Zorro III memory fails on some machines.
 
+**Sound** goes through AHI: Quake II mixes into a ring that AHI plays as one looping
+sample. `s_ahimode` (saved) is the AHI audio mode, by default the Warp's "16 bit mono"
+(`0x00570004`), and AHI's default mode where that is not there (`0`: always AHI's default
+mode); the ring is mono when the mode is, so Quake II writes half as much. `s_khz` (Quake II's,
+default 11) is the rate: 11, 22 or 44 kHz. Both take effect at `snd_restart`. At the defaults
+sound costs about 1.8 ms a frame (1.0 in Quake II's mixer, the rest in AHI's).
+
 A timedemo:
 
 ```
@@ -135,7 +144,7 @@ timedemo draws the same frames at any speed. The report goes to the console and
 
 `tools/bench.py` runs a timedemo on the Amiga through a remote-shell command (named by
 `AMIGA_RUNNER` in `tools/ftp_config.local`; see the script), and returns as soon as it ends:
-`--runs N`, `--bpp 16`, `--prof`, `--sample` (fetched and summarised with `tools/wprof.py`; build with
+`--runs N`, `--bpp 16`, `--sound` (off otherwise), `--prof`, `--sample` (fetched and summarised with `tools/wprof.py`; build with
 `make prof` first), `--crc`. Before each run it puts `tools/bench_config.cfg` into the game
 directory, so every run starts from the defaults. `tools/pchist.py` turns a sample profile into
 a per-instruction histogram of one asm function.
@@ -174,8 +183,9 @@ Engine bugs fixed on the way: an instant particle's time was read uninitialised
   renamed apart from the engine's, the instrumentation hooks, and the renderer work above.
   `quake2/ref_soft/*060.s` are the 68060 routines; `Q2_ASM` (the Makefile's `ASM`) chooses
   them over the C.
-- `src/` - the AmigaOS platform layer. `amiga_os.c`, `amiga_screen.c`, `amiga_input.c` and
-  `q2sample.c` include the OS headers; `sys_amiga.c`, `vid_amiga.c`, `swimp_amiga.c`,
-  `in_amiga.c`, `net_loop.c` and `q2prof.c` include the engine's. They meet only in
+- `src/` - the AmigaOS platform layer. `amiga_os.c`, `amiga_screen.c`, `amiga_input.c`,
+  `amiga_ahi.c` and `q2sample.c` include the OS headers; `sys_amiga.c`, `vid_amiga.c`,
+  `swimp_amiga.c`, `snddma_amiga.c`, `in_amiga.c`, `net_loop.c` and `q2prof.c` include the
+  engine's. They meet only in
   `amiga_q2.h` and `q2prof.h`.
 - `tools/` - uploads, downloads, the benchmark and CRC drivers, the profile readers.

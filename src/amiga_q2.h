@@ -57,6 +57,17 @@ void qaScreenBlend(int r, int g, int b, int alpha);  // 16 bpp: alpha 0..256, 0 
 void qaScreenPalette(const unsigned char *rgba);  // 256 entries of R, G, B, unused
 const char *qaScreenInfo(void);
 
+// ---- amiga_ahi.c: sound ----
+
+// AHI playing a looping ring of 16-bit samples, mono or stereo as the mode
+// is: the ring (NULL if there is no sound; never headless), its length in
+// frames, the rate and the channels AHI really uses.  mode 0 is AHI's
+// default mode, which is also taken when the one asked for is not there.
+void *qaSoundInit(unsigned long mode, int freq, int *frames, int *rate, int *channels);
+int qaSoundPos(void);                  // the frame AHI is playing
+const char *qaSoundInfo(void);
+void qaSoundShutdown(void);            // also the atexit() cleanup: safe to call twice
+
 // ---- amiga_input.c: the game window's input ----
 
 void qaInputStart(void);               // after qaScreenOpen

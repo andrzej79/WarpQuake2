@@ -34,6 +34,10 @@ VBCC        ?= $(SDK_DIR)/vbcc
 # vbcc has its own inline/ stubs.  The default is where they sit when this
 # repo is checked out next to them.
 P96_SDK     ?= ../csWarpAmigaSoftware/p96_gfx_driver/Picasso96Develop/Include
+# AHI's developer headers (devices/ahi.h; the ahidev archive on Aminet), for
+# src/amiga_ahi.c; vbcc has the proto/inline stubs.  The default is where
+# they sit when this repo is checked out next to csWarpAmigaSoftware.
+AHI_SDK     ?= ../csWarpAmigaSoftware/warpAHIDriver/ahidev_4.18/AHI/Developer/include/C
 # AMIGA: the few engine changes that are AmigaOS-specific (the base directory).
 DEF_FLAGS   := -DAMIGA -DGAME_HARD_LINKED -DREF_HARD_LINKED -DQ2_ASM=$(ASM) $(addprefix -D,$(DEFINES))
 
@@ -53,10 +57,10 @@ ASFLAGS := -quiet -Fhunk -m68060 -Iquake2/ref_soft
 # ---- Sources ----
 # id's engine, less what another platform layer or a DLL build would bring:
 # x86.c (i386 asm glue), sv_null.c (a server-less build), and of null/ only
-# the CD and sound stubs (src/ is the rest of the platform layer).
+# the CD stub (src/ is the rest of the platform layer, sound included).
 ENGINE_DIRS := client qcommon server ref_soft game
 ENGINE_SRC  := $(filter-out quake2/client/x86.c quake2/server/sv_null.c,$(foreach d,$(ENGINE_DIRS),$(wildcard quake2/$(d)/*.c))) \
-               quake2/null/cd_null.c quake2/null/snddma_null.c
+               quake2/null/cd_null.c
 ENGINE_OBJS := $(patsubst quake2/%.c,$(OBJ_DIR)/quake2/%.o,$(ENGINE_SRC))
 ENGINE_ASM  := $(if $(filter 1,$(ASM)),$(wildcard quake2/ref_soft/*.s))
 ENGINE_OBJS += $(patsubst quake2/%.s,$(OBJ_DIR)/quake2/%.o,$(ENGINE_ASM))
@@ -81,7 +85,7 @@ $(BIN): $(OBJS)
 # The platform layer sees the OS headers; the engine never does.
 $(OBJ_DIR)/src/%.o: src/%.c $(wildcard src/*.h) $(ENGINE_HDRS)
 	@$(MKDIR) $(@D)
-	$(CC) $(CFLAGS) -Isrc -I$(NDK_INC_C) -I$(P96_SDK) $(DEF_FLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -Isrc -I$(NDK_INC_C) -I$(P96_SDK) -I$(AHI_SDK) $(DEF_FLAGS) -c $< -o $@
 
 # Engine objects quietly, the log printed only on failure.
 $(OBJ_DIR)/quake2/%.o: quake2/%.c $(ENGINE_HDRS) $(wildcard src/q2prof.h src/amiga_q2.h)
