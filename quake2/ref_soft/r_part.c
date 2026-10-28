@@ -18,6 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 #include "r_local.h"
+#include "../../src/q2prof.h"
 
 vec3_t r_pright, r_pup, r_ppn;
 
@@ -629,6 +630,7 @@ void R_DrawParticles (void)
 
 		R_DrawParticle();
 	}
+	Q2C_ADD (Q2C_PARTICLES, r_newrefdef.num_particles);
 
 #if id386 && !defined __linux__
 	__asm fldcw word ptr [fpu_chop_cw]

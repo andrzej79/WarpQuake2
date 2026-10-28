@@ -78,7 +78,7 @@ void IN_SendKeyEvents(void)
   unsigned t;
 
   if(qaInputBreak()) {
-    Sys_Quit();
+    Com_Quit();                         // writes the config, as "quit" does
   }
   t = Sys_Milliseconds();
   while(qaInputKey(&code, &down)) {

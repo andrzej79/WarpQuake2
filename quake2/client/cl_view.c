@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // cl_view.c -- player rendering positioning
 
 #include "client.h"
+#include "../../src/q2prof.h"
 
 //=============
 //
@@ -452,8 +453,14 @@ void V_RenderView( float stereo_separation )
 	if (cl_timedemo->value)
 	{
 		if (!cl.timedemo_start)
+		{
 			cl.timedemo_start = Sys_Milliseconds ();
+			Q2P_TimedemoStart ();
+		}
 		cl.timedemo_frames++;
+		// -frames <n>: a shorter timedemo (vamos runs)
+		if (Q2P_TimedemoDone (cl.timedemo_frames))
+			Cbuf_AddText ("disconnect\n");
 	}
 
 	// an invalid frame will just use the exact previous refdef
@@ -533,6 +540,21 @@ void V_RenderView( float stereo_separation )
         qsort( cl.refdef.entities, cl.refdef.num_entities, sizeof( cl.refdef.entities[0] ), (int (*)(const void *, const void *))entitycmpfnc );
 	}
 
+	if (q2p_crcon)
+	{
+		// -crcfile: what the renderer is given, per kind, without the pointers
+		int i;
+
+		for (i = 0 ; i < r_numentities ; i++)
+		{
+			Q2P_InputCRC (0, &r_entities[i].angles, (char *)&r_entities[i].skin - (char *)&r_entities[i].angles);
+			Q2P_InputCRC (0, &r_entities[i].flags, sizeof(r_entities[i].flags));
+		}
+		Q2P_InputCRC (1, r_particles, r_numparticles * sizeof(particle_t));
+		Q2P_InputCRC (2, r_dlights, r_numdlights * sizeof(dlight_t));
+		Q2P_InputCRC (3, &cl.refdef, (char *)&cl.refdef.areabits - (char *)&cl.refdef);
+		Q2P_InputCRC (3, r_lightstyles, sizeof(r_lightstyles));
+	}
 	re.RenderFrame (&cl.refdef);
 	if (cl_stats->value)
 		Com_Printf ("ent:%i  lt:%i  part:%i\n", r_numentities, r_numdlights, r_numparticles);

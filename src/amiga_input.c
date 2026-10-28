@@ -64,7 +64,7 @@ void qaInputStart(void)
   keyHead = keyTail = 0;
   mouseDx = mouseDy = 0;
   windowActive = TRUE;
-  if(inputHandlerOn) {
+  if(inputHandlerOn || qaHeadless) {
     return;
   }
   inputPort = CreateMsgPort();

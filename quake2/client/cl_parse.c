@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // cl_parse.c  -- parse a message received from the server
 
 #include "client.h"
+#include "../../src/q2prof.h"
 
 char *svc_strings[256] =
 {
@@ -321,6 +322,7 @@ void CL_ParseServerData (void)
 
 	cl.servercount = MSG_ReadLong (&net_message);
 	cl.attractloop = MSG_ReadByte (&net_message);
+	Q2P_ServerData ();
 
 	// game directory
 	str = MSG_ReadString (&net_message);

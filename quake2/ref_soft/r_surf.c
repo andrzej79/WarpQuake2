@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // r_surf.c: surface-related refresh code
 
 #include "r_local.h"
+#include "../../src/q2prof.h"
 
 drawsurf_t	r_drawsurf;
 
@@ -639,11 +640,17 @@ surfcache_t *D_CacheSurface (msurface_t *surface, int miplevel)
 
 	c_surf++;
 
-	// calculate the lightings
-	R_BuildLightMap ();
+	{
+		Q2P_BEGIN (Q2P_D_CACHE);
+		// calculate the lightings
+		R_BuildLightMap ();
 	
-	// rasterize the surface into the cache
-	R_DrawSurface ();
+		// rasterize the surface into the cache
+		R_DrawSurface ();
+		Q2P_END (Q2P_D_CACHE);
+	}
+	Q2C_ADD (Q2C_CACHE_BUILDS, 1);
+	Q2C_ADD (Q2C_CACHE_BYTES, r_drawsurf.surfwidth * r_drawsurf.surfheight);
 
 	return cache;
 }

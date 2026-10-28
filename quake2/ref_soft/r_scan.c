@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // Portable C scan-level rasterization code, all pixel depths.
 
 #include "r_local.h"
+#include "../../src/q2prof.h"
 
 unsigned char	*r_turb_pbase, *r_turb_pdest;
 fixed16_t		r_turb_s, r_turb_t, r_turb_sstep, r_turb_tstep;
@@ -145,6 +146,7 @@ void Turbulent8 (espan_t *pspan)
 				(r_screenwidth * pspan->v) + pspan->u);
 
 		count = pspan->count;
+		Q2C_ADD (Q2C_TURB_PIXELS, count);
 
 	// calculate the initial s/z, t/z, 1/z, s, and t and clamp
 		du = (float)pspan->u;
@@ -281,6 +283,7 @@ void NonTurbulent8 (espan_t *pspan)
 				(r_screenwidth * pspan->v) + pspan->u);
 
 		count = pspan->count;
+		Q2C_ADD (Q2C_TURB_PIXELS, count);
 
 	// calculate the initial s/z, t/z, 1/z, s, and t and clamp
 		du = (float)pspan->u;
@@ -419,6 +422,8 @@ void D_DrawSpans16 (espan_t *pspan)
 				(r_screenwidth * pspan->v) + pspan->u);
 
 		count = pspan->count;
+		Q2C_ADD (Q2C_SPAN_PIXELS, count);
+		Q2C_ADD (Q2C_SPANS, 1);
 
 	// calculate the initial s/z, t/z, 1/z, s, and t and clamp
 		du = (float)pspan->u;
@@ -539,7 +544,6 @@ void D_DrawZSpans (espan_t *pspan)
 	int				count, doublecount, izistep;
 	int				izi;
 	short			*pdest;
-	unsigned		ltemp;
 	float			zi;
 	float			du, dv;
 
@@ -552,6 +556,7 @@ void D_DrawZSpans (espan_t *pspan)
 		pdest = d_pzbuffer + (d_zwidth * pspan->v) + pspan->u;
 
 		count = pspan->count;
+		Q2C_ADD (Q2C_ZSPAN_PIXELS, count);
 
 	// calculate the initial 1/z
 		du = (float)pspan->u;
@@ -572,11 +577,13 @@ void D_DrawZSpans (espan_t *pspan)
 		{
 			do
 			{
-				ltemp = izi >> 16;
+			// id packed the pair into one int with the second pixel in the
+			// high half: right on x86, swapped on a big-endian 68k.  Two
+			// shorts are endian-neutral.
+				pdest[0] = (short)(izi >> 16);
 				izi += izistep;
-				ltemp |= izi & 0xFFFF0000;
+				pdest[1] = (short)(izi >> 16);
 				izi += izistep;
-				*(int *)pdest = ltemp;
 				pdest += 2;
 			} while (--doublecount > 0);
 		}

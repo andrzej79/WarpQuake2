@@ -10,7 +10,7 @@
 
 // ---- amiga_os.c: system ----
 
-int qaInit(void);                      // libraries and timer; 0 on failure (message printed)
+int qaInit(int headless);              // libraries and timer; 0 on failure (message printed)
 void qaShutdown(void);                 // also the atexit() cleanup: safe to call twice
 int qaFromWorkbench(void);
 unsigned qaMilliseconds(void);         // since qaInit()
@@ -21,9 +21,11 @@ void qaShowError(const char *msg);     // after the screen is closed: a requeste
 int qaSetEnv(const char *name, const char *value);  // a local shell variable; 0 on failure
 
 // Memory for a hunk: maxsize bytes, cleared, then cut down to what was used
-// (the tail goes back to the system).  Sizes are the ones passed in.
+// (the tail goes back to the system); qaHunkTrim returns the size it kept,
+// which qaHunkFree is given.  Headless (vamos, which cannot free part of a
+// block) a hunk keeps its whole reservation.
 void *qaHunkAlloc(unsigned maxsize);
-void qaHunkTrim(void *base, unsigned maxsize, unsigned used);
+unsigned qaHunkTrim(void *base, unsigned maxsize, unsigned used);
 void qaHunkFree(void *base, unsigned size);
 
 // Directory scan, one at a time: the entries of dir whose names match pattern
@@ -35,6 +37,9 @@ void qaFindClose(void);
 
 // ---- amiga_screen.c: the RTG screen ----
 
+// -headless (vamos, which has no graphics): no screen, no input; the frame is
+// only rendered, at the size asked for
+extern int qaHeadless;
 int qaScreenOpen(int width, int height);   // an 8-bit screen in the closest RTG mode; 0 on failure
 void qaScreenClose(void);
 void qaScreenShutdown(void);                // the screen and the libraries, at exit

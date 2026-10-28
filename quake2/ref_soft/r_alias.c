@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 ** use a real variable to control lerping
 */
 #include "r_local.h"
+#include "../../src/q2prof.h"
 
 #define LIGHT_MIN	5		// lowest light value we'll allow, to avoid the
 							//  need for inner-loop light clamping
@@ -1054,6 +1055,8 @@ void R_AliasDrawModel (void)
 	extern void R_PolysetDrawSpans8_66( void * );
 	extern void R_PolysetDrawSpansConstant8_33( void * );
 	extern void R_PolysetDrawSpansConstant8_66( void * );
+
+	Q2C_ADD (Q2C_ALIAS_MODELS, 1);
 
 	s_pmdl = (dmdl_t *)currentmodel->extradata;
 

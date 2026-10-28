@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // r_edge.c
 
 #include "r_local.h"
+#include "../../src/q2prof.h"
 
 #ifndef id386
 void R_SurfacePatch (void)
@@ -1090,6 +1091,7 @@ May be called more than once a frame if the surf list overflows (higher res)
 void D_DrawSurfaces (void)
 {
 	surf_t			*s;
+	Q2P_BEGIN (Q2P_D_SURFS);
 
 //	currententity = NULL;	//&r_worldentity;
 	VectorSubtract (r_origin, vec3_origin, modelorg);
@@ -1117,6 +1119,7 @@ void D_DrawSurfaces (void)
 	}
 	else
 		D_DrawflatSurfaces ();
+	Q2P_END (Q2P_D_SURFS);
 
 	currententity = NULL;	//&r_worldentity;
 	VectorSubtract (r_origin, vec3_origin, modelorg);

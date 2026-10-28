@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // r_main.c
 
 #include "r_local.h"
+#include "../../src/q2prof.h"
 
 viddef_t	vid;
 refimport_t	ri;
@@ -887,7 +888,11 @@ void R_EdgeDrawing (void)
 		rw_time1 = Sys_Milliseconds ();
 	}
 
-	R_RenderWorld ();
+	{
+		Q2P_BEGIN (Q2P_R_WORLD);
+		R_RenderWorld ();
+		Q2P_END (Q2P_R_WORLD);
+	}
 
 	if (r_dspeeds->value)
 	{
@@ -895,7 +900,11 @@ void R_EdgeDrawing (void)
 		db_time1 = rw_time2;
 	}
 
-	R_DrawBEntitiesOnList ();
+	{
+		Q2P_BEGIN (Q2P_R_BMODELS);
+		R_DrawBEntitiesOnList ();
+		Q2P_END (Q2P_R_BMODELS);
+	}
 
 	if (r_dspeeds->value)
 	{
@@ -903,7 +912,11 @@ void R_EdgeDrawing (void)
 		se_time1 = db_time2;
 	}
 
-	R_ScanEdges ();
+	{
+		Q2P_BEGIN (Q2P_R_SCAN);
+		R_ScanEdges ();
+		Q2P_END (Q2P_R_SCAN);
+	}
 }
 
 //=======================================================================
@@ -988,7 +1001,25 @@ R_RenderFrame
 
 @@@@@@@@@@@@@@@@
 */
+static void R_RenderFrame2 (refdef_t *fd);
+
+// the whole 3D view, timed (q2prof)
 void R_RenderFrame (refdef_t *fd)
+{
+	Q2P_BEGIN (Q2P_RENDER);
+	// -crc: a few pixels of a frame (cracks between spans) are not drawn and
+	// keep the last frame's colour and depth, which since the loading screens
+	// differ from run to run; cleared, every frame depends on its own input
+	if (q2p_crcon)
+	{
+		memset (vid.buffer, 0, vid.rowbytes * vid.height);
+		memset (d_pzbuffer, 0, vid.width * vid.height * sizeof(*d_pzbuffer));
+	}
+	R_RenderFrame2 (fd);
+	Q2P_END (Q2P_RENDER);
+}
+
+static void R_RenderFrame2 (refdef_t *fd)
 {
 	r_newrefdef = *fd;
 
@@ -1001,11 +1032,15 @@ void R_RenderFrame (refdef_t *fd)
 	if (r_speeds->value || r_dspeeds->value)
 		r_time1 = Sys_Milliseconds ();
 
-	R_SetupFrame ();
+	{
+		Q2P_BEGIN (Q2P_R_SETUP);
+		R_SetupFrame ();
 
-	R_MarkLeaves ();	// done here so we know if we're in water
+		R_MarkLeaves ();	// done here so we know if we're in water
 
-	R_PushDlights (r_worldmodel);
+		R_PushDlights (r_worldmodel);
+		Q2P_END (Q2P_R_SETUP);
+	}
 
 	R_EdgeDrawing ();
 
@@ -1015,7 +1050,11 @@ void R_RenderFrame (refdef_t *fd)
 		de_time1 = se_time2;
 	}
 
-	R_DrawEntitiesOnList ();
+	{
+		Q2P_BEGIN (Q2P_R_ENTS);
+		R_DrawEntitiesOnList ();
+		Q2P_END (Q2P_R_ENTS);
+	}
 
 	if (r_dspeeds->value)
 	{
@@ -1023,17 +1062,29 @@ void R_RenderFrame (refdef_t *fd)
 		dp_time1 = Sys_Milliseconds ();
 	}
 
-	R_DrawParticles ();
+	{
+		Q2P_BEGIN (Q2P_R_PARTICLES);
+		R_DrawParticles ();
+		Q2P_END (Q2P_R_PARTICLES);
+	}
 
 	if (r_dspeeds->value)
 		dp_time2 = Sys_Milliseconds ();
 
-	R_DrawAlphaSurfaces();
+	{
+		Q2P_BEGIN (Q2P_R_ALPHA);
+		R_DrawAlphaSurfaces();
+		Q2P_END (Q2P_R_ALPHA);
+	}
 
 	R_SetLightLevel ();
 
 	if (r_dowarp)
+	{
+		Q2P_BEGIN (Q2P_R_WARP);
 		D_WarpScreen ();
+		Q2P_END (Q2P_R_WARP);
+	}
 
 	if (r_dspeeds->value)
 		da_time1 = Sys_Milliseconds ();
@@ -1041,7 +1092,11 @@ void R_RenderFrame (refdef_t *fd)
 	if (r_dspeeds->value)
 		da_time2 = Sys_Milliseconds ();
 
-	R_CalcPalette ();
+	{
+		Q2P_BEGIN (Q2P_R_PALETTE);
+		R_CalcPalette ();
+		Q2P_END (Q2P_R_PALETTE);
+	}
 
 	if (sw_aliasstats->value)
 		R_PrintAliasStats ();

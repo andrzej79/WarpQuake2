@@ -2209,6 +2209,9 @@ void CL_AddParticles (void)
 		}
 		else
 		{
+			// an instant particle sits at its origin; id left time unset here,
+			// so it was drawn wherever the stack garbage put it
+			time = 0;
 			alpha = p->alpha;
 		}
 

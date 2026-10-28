@@ -23,6 +23,7 @@
 #include <proto/timer.h>
 
 #include "amiga_q2.h"
+#include "q2sample.h"
 
 struct IntuitionBase *IntuitionBase = NULL;
 struct Device *TimerBase = NULL;
@@ -100,7 +101,7 @@ SYSTEM
 ===============================================================================
 */
 
-int qaInit(void)
+int qaInit(int headless)
 {
   // Workbench start: vbcc's startup code leaves the WBStartup message in
   // _WBenchMsg; the program runs from its own directory either way, since
@@ -108,8 +109,9 @@ int qaInit(void)
   extern struct WBStartup *_WBenchMsg;
 
   fromWorkbench = (_WBenchMsg != NULL);
+  qaHeadless = headless;
   IntuitionBase = (struct IntuitionBase *)OpenLibrary("intuition.library", 39);
-  if(IntuitionBase == NULL) {
+  if(IntuitionBase == NULL && !headless) {
     printf("WarpQuake2 needs AmigaOS 3.0 or newer\n");
     return 0;
   }
@@ -122,6 +124,9 @@ int qaInit(void)
 
 void qaShutdown(void)
 {
+  // the sampler task first: it must not outlive the code it runs in
+  wprofStop();
+  wprofFree();
   qaInputStop();
   qaScreenShutdown();
   qaFindClose();
@@ -177,13 +182,17 @@ void *qaHunkAlloc(unsigned maxsize)
   return AllocMem(HUNK_ROUND(maxsize), MEMF_ANY | MEMF_CLEAR);
 }
 
-void qaHunkTrim(void *base, unsigned maxsize, unsigned used)
+unsigned qaHunkTrim(void *base, unsigned maxsize, unsigned used)
 {
   ULONG keep = HUNK_ROUND(used), all = HUNK_ROUND(maxsize);
 
+  if(qaHeadless) {
+    return all;
+  }
   if(keep < all) {
     FreeMem((UBYTE *)base + keep, all - keep);
   }
+  return keep;
 }
 
 void qaHunkFree(void *base, unsigned size)

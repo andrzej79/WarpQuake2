@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // cl_main.c  -- client main loop
 
 #include "client.h"
+#include "../../src/q2prof.h"
 
 cvar_t	*freelook;
 
@@ -627,6 +628,8 @@ void CL_Disconnect (void)
 		if (time > 0)
 			Com_Printf ("%i frames, %3.1f seconds: %3.1f fps\n", cl.timedemo_frames,
 			time/1000.0, cl.timedemo_frames*1000.0 / time);
+		if (cl.timedemo_start)
+			Q2P_TimedemoEnd (cl.timedemo_frames, time);
 	}
 
 	VectorClear (cl.refdef.blend);
@@ -1698,7 +1701,17 @@ void CL_Frame (int msec)
 	// decide the simulation time
 	cls.frametime = extratime/1000.0;
 	cl.time += extratime;
-	cls.realtime = curtime;
+	// with a fixedtime the client's real time steps as the game's does, so a
+	// timedemo draws the same frames (console notify lines, step smoothing,
+	// blinking) however fast it runs: -crc compares builds by them
+	{
+		extern cvar_t *fixedtime;
+
+		if (fixedtime->value)
+			cls.realtime += extratime;
+		else
+			cls.realtime = curtime;
+	}
 
 	extratime = 0;
 #if 0
@@ -1714,13 +1727,21 @@ void CL_Frame (int msec)
 		cls.netchan.last_received = Sys_Milliseconds ();
 
 	// fetch results from server
-	CL_ReadPackets ();
+	{
+		Q2P_BEGIN (Q2P_CLIENT);
+		CL_ReadPackets ();
+		Q2P_END (Q2P_CLIENT);
+	}
 
 	// send a new command message to the server
 	CL_SendCommand ();
 
 	// predict all unacknowledged movements
-	CL_PredictMovement ();
+	{
+		Q2P_BEGIN (Q2P_PREDICT);
+		CL_PredictMovement ();
+		Q2P_END (Q2P_PREDICT);
+	}
 
 	// allow rendering DLL change
 	VID_CheckChanges ();
@@ -1730,12 +1751,20 @@ void CL_Frame (int msec)
 	// update the screen
 	if (host_speeds->value)
 		time_before_ref = Sys_Milliseconds ();
-	SCR_UpdateScreen ();
+	{
+		Q2P_BEGIN (Q2P_SCREEN);
+		SCR_UpdateScreen ();
+		Q2P_END (Q2P_SCREEN);
+	}
 	if (host_speeds->value)
 		time_after_ref = Sys_Milliseconds ();
 
 	// update audio
-	S_Update (cl.refdef.vieworg, cl.v_forward, cl.v_right, cl.v_up);
+	{
+		Q2P_BEGIN (Q2P_SOUND);
+		S_Update (cl.refdef.vieworg, cl.v_forward, cl.v_right, cl.v_up);
+		Q2P_END (Q2P_SOUND);
+	}
 	
 	CDAudio_Update();
 

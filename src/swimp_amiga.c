@@ -3,6 +3,7 @@
 
 #include "../quake2/ref_soft/r_local.h"
 #include "amiga_q2.h"
+#include "q2prof.h"
 
 /*
 ==========================================================================
@@ -32,7 +33,16 @@ void SWimp_BeginFrame(float camera_separation)
 
 void SWimp_EndFrame(void)
 {
-  qaScreenBlit(vid.buffer, vid.rowbytes, vid.width, vid.height);
+  {
+    Q2P_BEGIN(Q2P_CRC);
+    Q2P_FrameCRC(vid.buffer, vid.width, vid.height, vid.rowbytes);
+    Q2P_END(Q2P_CRC);
+  }
+  {
+    Q2P_BEGIN(Q2P_BLIT);
+    qaScreenBlit(vid.buffer, vid.rowbytes, vid.width, vid.height);
+    Q2P_END(Q2P_BLIT);
+  }
 }
 
 void SWimp_SetPalette(const unsigned char *palette)

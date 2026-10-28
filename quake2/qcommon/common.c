@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // common.c -- misc functions used in client and server
 #include "qcommon.h"
+#include "../../src/q2prof.h"
 #include <setjmp.h>
 
 #define	MAXPRINTMSG	4096
@@ -1413,6 +1414,7 @@ void Qcommon_Init (int argc, char **argv)
 
 	Cmd_Init ();
 	Cvar_Init ();
+	Q2P_Init ();
 
 	Key_Init ();
 
@@ -1496,6 +1498,10 @@ void Qcommon_Frame (int msec)
 	if (setjmp (abortframe) )
 		return;			// an ERR_DROP was thrown
 
+	Q2P_FrameStart ();
+	{
+	Q2P_BEGIN_FRAME;
+
 	if ( log_stats->modified )
 	{
 		log_stats->modified = false;
@@ -1551,7 +1557,11 @@ void Qcommon_Frame (int msec)
 	if (host_speeds->value)
 		time_before = Sys_Milliseconds ();
 
-	SV_Frame (msec);
+	{
+		Q2P_BEGIN (Q2P_SERVER);
+		SV_Frame (msec);
+		Q2P_END (Q2P_SERVER);
+	}
 
 	if (host_speeds->value)
 		time_between = Sys_Milliseconds ();		
@@ -1576,6 +1586,9 @@ void Qcommon_Frame (int msec)
 		Com_Printf ("all:%3i sv:%3i gm:%3i cl:%3i rf:%3i\n",
 			all, sv, gm, cl, rf);
 	}	
+
+	Q2P_END_FRAME;
+	}
 }
 
 /*

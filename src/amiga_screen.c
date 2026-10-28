@@ -34,6 +34,7 @@
 struct GfxBase *GfxBase = NULL;
 struct Library *P96Base = NULL;
 struct Window *qaWindow = NULL;        // amiga_input.c reads its port
+int qaHeadless;
 
 static struct Screen *screen = NULL;
 static UWORD *blankPointer = NULL;     // chip RAM, for SetPointer
@@ -62,6 +63,12 @@ int qaScreenOpen(int width, int height)
   ULONG id;
 
   qaScreenClose();
+  if(qaHeadless) {
+    screenWidth = width;
+    screenHeight = height;
+    sprintf(info, "headless %dx%d", width, height);
+    return 1;
+  }
   if(!openLibraries()) {
     printf("WarpQuake2: needs graphics.library V40 and Picasso96API.library V2 (RTG)\n");
     return 0;

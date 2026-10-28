@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // texture (used for Alias models)
 
 #include "r_local.h"
+#include "../../src/q2prof.h"
 
 int	rand1k[] = {
 #include "rand1k.h"
@@ -1042,6 +1043,7 @@ void R_PolysetDrawSpans8_Opaque (spanpackage_t *pspanpackage)
 	do
 	{
 		lcount = d_aspancount - pspanpackage->count;
+		Q2C_ADD (Q2C_POLY_PIXELS, lcount);
 
 		errorterm += erroradjustup;
 		if (errorterm >= 0)

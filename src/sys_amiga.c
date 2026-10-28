@@ -80,8 +80,7 @@ void Sys_Error(char *error, ...)
 
 void Sys_Quit(void)
 {
-  CL_Shutdown();
-  Qcommon_Shutdown();
+  // after Com_Quit has shut the client and server down
   exit(0);
 }
 
@@ -186,8 +185,7 @@ void *Hunk_Alloc(int size)
 
 int Hunk_End(void)
 {
-  qaHunkTrim(hunkBase, hunkMax, HUNK_HEADER + hunkUsed);
-  *(int *)hunkBase = HUNK_HEADER + hunkUsed;
+  *(int *)hunkBase = qaHunkTrim(hunkBase, hunkMax, HUNK_HEADER + hunkUsed);
   return hunkUsed;
 }
 
@@ -293,8 +291,17 @@ int main(int argc, char **argv)
     argv = wbArgv;
   }
   atexit(qaShutdown);
-  if(!qaInit()) {
-    return 20;
+  {
+    int i, headless = 0;
+
+    for(i = 1; i < argc; i++) {
+      if(!strcmp(argv[i], "-headless")) {
+        headless = 1;
+      }
+    }
+    if(!qaInit(headless)) {
+      return 20;
+    }
   }
   printf(VERSION_STRING "\n");
 

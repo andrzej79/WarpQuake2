@@ -79,7 +79,7 @@ $(OBJ_DIR)/src/%.o: src/%.c $(wildcard src/*.h) $(ENGINE_HDRS)
 	$(CC) $(CFLAGS) -Isrc -I$(NDK_INC_C) -I$(P96_SDK) $(DEF_FLAGS) -c $< -o $@
 
 # Engine objects quietly, the log printed only on failure.
-$(OBJ_DIR)/quake2/%.o: quake2/%.c $(ENGINE_HDRS)
+$(OBJ_DIR)/quake2/%.o: quake2/%.c $(ENGINE_HDRS) $(wildcard src/q2prof.h src/amiga_q2.h)
 	@$(MKDIR) $(@D)
 	@echo "  CC $<"
 	@$(CC) $(CFLAGS) $(DEF_FLAGS) -c $< -o $@ > $@.log 2>&1 || { cat $@.log; exit 1; }
