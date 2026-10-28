@@ -216,16 +216,117 @@ void R_EmitSkyBox (void)
 R_EmitEdge
 ================
 */
+/*
+================
+R_ProjectVertex
+
+WarpQuake: one vertex transformed and projected, the way R_EmitEdge did its
+second vertex: screen u and v clamped to the view, and 1/z, all floats.
+================
+*/
+static void R_ProjectVertex (mvertex_t *pv, projvert_t *out)
+{
+	vec3_t	local, transformed;
+	float	lzi, u, v;
+
+	VectorSubtract (pv->position, modelorg, local);
+	TransformVector (local, transformed);
+
+	if (transformed[2] < NEAR_CLIP)
+		transformed[2] = NEAR_CLIP;
+
+	lzi = 1.0 / transformed[2];
+
+	u = (xcenter + xscale*lzi*transformed[0]);
+	if (u < r_refdef.fvrectx_adj)
+		u = r_refdef.fvrectx_adj;
+	if (u > r_refdef.fvrectright_adj)
+		u = r_refdef.fvrectright_adj;
+
+	v = (ycenter - yscale*lzi*transformed[1]);
+	if (v < r_refdef.fvrecty_adj)
+		v = r_refdef.fvrecty_adj;
+	if (v > r_refdef.fvrectbottom_adj)
+		v = r_refdef.fvrectbottom_adj;
+
+	out->u = u;
+	out->v = v;
+	out->lzi = lzi;
+}
+
+/*
+================
+R_ProjectedVertex
+
+WarpQuake: a world vertex is shared by several edges, so its projection is
+kept for the rest of this modelorg/view setup (r_projstamp).  Clipped
+vertices (not in the world's vertex array) are projected every time.
+================
+*/
+projvert_t	*r_projverts;
+int			r_projstamp = 1;
+unsigned long	r_projhits, r_projmisses;	// for the profile
+static projvert_t	r_projtemp;
+
+mvertex_t	*r_projvertbase;
+unsigned	r_projlimit;
+
+void R_AllocProjVerts (void)
+{
+	// per map, as the world model is (R_NewMap)
+	if (r_projverts)
+		free (r_projverts);
+	r_projverts = malloc (r_worldmodel->numvertexes * sizeof(projvert_t));
+	if (!r_projverts)
+		ri.Sys_Error (ERR_FATAL, "R_AllocProjVerts: out of memory");
+	r_projvertbase = r_worldmodel->vertexes;
+	r_projlimit = r_worldmodel->numvertexes * sizeof(mvertex_t);
+	r_projstamp++;
+}
+
+static projvert_t *R_ProjectedVertex (mvertex_t *pv)
+{
+	unsigned	i = (unsigned)(pv - r_worldmodel->vertexes);
+	projvert_t	*p;
+
+	if (i >= (unsigned)r_worldmodel->numvertexes)
+	{
+		R_ProjectVertex (pv, &r_projtemp);
+		return &r_projtemp;
+	}
+	p = &r_projverts[i];
+	if (p->stamp != r_projstamp)
+	{
+		R_ProjectVertex (pv, p);
+		p->stamp = r_projstamp;
+		r_projmisses++;
+	}
+	else
+		r_projhits++;
+	return p;
+}
+
+#if Q2_ASM
+// r_draw060.s reads these at fixed offsets
+typedef char check_fvrectx_adj[(offsetof (oldrefdef_t, fvrectx_adj) == 68) ? 1 : -1];
+typedef char check_fvrecty_adj[(offsetof (oldrefdef_t, fvrecty_adj) == 72) ? 1 : -1];
+typedef char check_vrect_x_adj_shift20[(offsetof (oldrefdef_t, vrect_x_adj_shift20) == 76) ? 1 : -1];
+typedef char check_vrectright_adj_shift20[(offsetof (oldrefdef_t, vrectright_adj_shift20) == 80) ? 1 : -1];
+typedef char check_fvrectright_adj[(offsetof (oldrefdef_t, fvrectright_adj) == 84) ? 1 : -1];
+typedef char check_fvrectbottom_adj[(offsetof (oldrefdef_t, fvrectbottom_adj) == 88) ? 1 : -1];
+typedef char check_edge_size[(sizeof (edge_t) == 32) ? 1 : -1];
+typedef char check_projvert_size[(sizeof (projvert_t) == 2 * sizeof (mvertex_t)) ? 1 : -1];
+#endif
+#if !Q2_ASM	// r_draw060.s (R_ClipEdge with R_EmitEdge folded in)
 void R_EmitEdge (mvertex_t *pv0, mvertex_t *pv1)
 {
 	edge_t	*edge, *pcheck;
 	int		u_check;
 	float	u, u_step;
-	vec3_t	local, transformed;
-	float	*world;
 	int		v, v2, ceilv0;
-	float	scale, lzi0, u0, v0;
+	float	lzi0, u0, v0;
 	int		side;
+	projvert_t	*p;
 
 	if (r_lastvertvalid)
 	{
@@ -236,59 +337,17 @@ void R_EmitEdge (mvertex_t *pv0, mvertex_t *pv1)
 	}
 	else
 	{
-		world = &pv0->position[0];
-	
-	// transform and project
-		VectorSubtract (world, modelorg, local);
-		TransformVector (local, transformed);
-	
-		if (transformed[2] < NEAR_CLIP)
-			transformed[2] = NEAR_CLIP;
-	
-		lzi0 = 1.0 / transformed[2];
-	
-	// FIXME: build x/yscale into transform?
-		scale = xscale * lzi0;
-		u0 = (xcenter + scale*transformed[0]);
-		if (u0 < r_refdef.fvrectx_adj)
-			u0 = r_refdef.fvrectx_adj;
-		if (u0 > r_refdef.fvrectright_adj)
-			u0 = r_refdef.fvrectright_adj;
-	
-		scale = yscale * lzi0;
-		v0 = (ycenter - scale*transformed[1]);
-		if (v0 < r_refdef.fvrecty_adj)
-			v0 = r_refdef.fvrecty_adj;
-		if (v0 > r_refdef.fvrectbottom_adj)
-			v0 = r_refdef.fvrectbottom_adj;
-	
+		p = R_ProjectedVertex (pv0);
+		u0 = p->u;
+		v0 = p->v;
+		lzi0 = p->lzi;
 		ceilv0 = (int) ceil(v0);
 	}
 
-	world = &pv1->position[0];
-
-// transform and project
-	VectorSubtract (world, modelorg, local);
-	TransformVector (local, transformed);
-
-	if (transformed[2] < NEAR_CLIP)
-		transformed[2] = NEAR_CLIP;
-
-	r_lzi1 = 1.0 / transformed[2];
-
-	scale = xscale * r_lzi1;
-	r_u1 = (xcenter + scale*transformed[0]);
-	if (r_u1 < r_refdef.fvrectx_adj)
-		r_u1 = r_refdef.fvrectx_adj;
-	if (r_u1 > r_refdef.fvrectright_adj)
-		r_u1 = r_refdef.fvrectright_adj;
-
-	scale = yscale * r_lzi1;
-	r_v1 = (ycenter - scale*transformed[1]);
-	if (r_v1 < r_refdef.fvrecty_adj)
-		r_v1 = r_refdef.fvrecty_adj;
-	if (r_v1 > r_refdef.fvrectbottom_adj)
-		r_v1 = r_refdef.fvrectbottom_adj;
+	p = R_ProjectedVertex (pv1);
+	r_u1 = p->u;
+	r_v1 = p->v;
+	r_lzi1 = p->lzi;
 
 	if (r_lzi1 > lzi0)
 		lzi0 = r_lzi1;
@@ -388,6 +447,7 @@ void R_EmitEdge (mvertex_t *pv0, mvertex_t *pv1)
 	edge->nextremove = removeedges[v2];
 	removeedges[v2] = edge;
 }
+#endif
 
 
 /*
@@ -395,6 +455,7 @@ void R_EmitEdge (mvertex_t *pv0, mvertex_t *pv1)
 R_ClipEdge
 ================
 */
+#if !Q2_ASM	// r_draw060.s
 void R_ClipEdge (mvertex_t *pv0, mvertex_t *pv1, clipplane_t *clip)
 {
 	float		d0, d1, f;
@@ -490,6 +551,7 @@ void R_ClipEdge (mvertex_t *pv0, mvertex_t *pv1, clipplane_t *clip)
 // add the edge
 	R_EmitEdge (pv0, pv1);
 }
+#endif
 
 #endif	// !id386
 

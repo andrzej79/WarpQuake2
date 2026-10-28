@@ -380,6 +380,7 @@ R_NewMap
 void R_NewMap (void)
 {
 	r_viewcluster = -1;
+	R_AllocProjVerts ();	// WarpQuake: the world vertex projection cache
 
 	r_cnumsurfs = sw_maxsurfs->value;
 
@@ -814,6 +815,7 @@ void R_DrawBEntitiesOnList (void)
 
 	// FIXME: stop transforming twice
 		R_RotateBmodel ();
+		r_projstamp++;	// WarpQuake: modelorg and the view axes changed
 
 	// calculate dynamic lighting for bmodel
 		R_PushDlights (currentmodel);
@@ -839,6 +841,7 @@ void R_DrawBEntitiesOnList (void)
 		VectorCopy (base_vright, vright);
 		VectorCopy (oldorigin, modelorg);
 		R_TransformFrustum ();
+		r_projstamp++;
 	}
 
 	insubmodel = false;

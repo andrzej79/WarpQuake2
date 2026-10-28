@@ -628,6 +628,7 @@ void R_RenderWorld (void)
 	currententity = &r_worldentity;
 
 	VectorCopy (r_origin, modelorg);
+	r_projstamp++;		// WarpQuake: projected vertices are per modelorg/view
 	currentmodel = r_worldmodel;
 	r_pcurrentvertbase = currentmodel->vertexes;
 

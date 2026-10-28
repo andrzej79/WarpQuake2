@@ -712,6 +712,20 @@ typedef struct
 
 extern aliastriangleparms_t aliastriangleparms;
 
+// WarpQuake: projected world vertices (r_rast.c)
+typedef struct
+{
+	float	u, v, lzi;		// clamped screen position and 1/z, as R_EmitEdge uses them
+	int		stamp;			// valid while == r_projstamp
+	int		pad[2];			// 24 bytes: twice an mvertex_t, so r_draw060.s finds
+							// the entry at 2 * the vertex's byte offset
+} projvert_t;
+extern projvert_t	*r_projverts;	// one per world vertex, allocated by R_NewMap
+extern int			r_projstamp;	// bumped whenever modelorg or the view axes change
+extern mvertex_t	*r_projvertbase;	// r_worldmodel->vertexes ...
+extern unsigned		r_projlimit;		// ... and its size in bytes
+void R_AllocProjVerts (void);
+
 void R_DrawTriangle( void );
 //void R_DrawTriangle (finalvert_t *index0, finalvert_t *index1, finalvert_t *index2);
 void R_AliasClipTriangle (finalvert_t *index0, finalvert_t *index1, finalvert_t *index2);
