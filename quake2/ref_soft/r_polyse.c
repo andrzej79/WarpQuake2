@@ -264,6 +264,7 @@ void R_DrawTriangle( void )
 R_PolysetScanLeftEdge_C
 ====================
 */
+#if !Q2_ASM	// r_polyse060.s
 void R_PolysetScanLeftEdge_C(int height)
 {
 	do
@@ -323,6 +324,7 @@ void R_PolysetScanLeftEdge_C(int height)
 		}
 	} while (--height);
 }
+#endif
 
 /*
 ===================
@@ -1036,6 +1038,13 @@ void R_PolysetDrawSpansConstant8_66( spanpackage_t *pspanpackage)
 }
 
 #if !id386
+#if Q2_ASM
+// r_polyse060.s draws the normal case and comes here for the IR goggles; it
+// reads these two flags at fixed offsets
+typedef char check_rdflags_offset[(offsetof (refdef_t, rdflags) == 68) ? 1 : -1];
+typedef char check_entity_flags_offset[(offsetof (entity_t, flags) == 68) ? 1 : -1];
+#define R_PolysetDrawSpans8_Opaque R_PolysetDrawSpans8_OpaqueC
+#endif
 void R_PolysetDrawSpans8_Opaque (spanpackage_t *pspanpackage)
 {
 	int		lcount;
@@ -1105,6 +1114,9 @@ void R_PolysetDrawSpans8_Opaque (spanpackage_t *pspanpackage)
 		pspanpackage++;
 	} while (pspanpackage->count != -999999);
 }
+#if Q2_ASM
+#undef R_PolysetDrawSpans8_Opaque
+#endif
 #endif
 
 
