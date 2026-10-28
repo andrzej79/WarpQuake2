@@ -247,6 +247,19 @@ typedef struct
 
 aliasbatchedtransformdata_t aliasbatchedtransformdata;
 
+/*
+================
+R_AliasTriangleHidden
+
+WarpQuake: R_DrawTriangle's test, alone: true if it would draw nothing for
+the triangle a, b, c (d_xdenom >= 0 covers its zero-length-edge returns too).
+================
+*/
+static qboolean R_AliasTriangleHidden (finalvert_t *a, finalvert_t *b, finalvert_t *c)
+{
+	return ( (a->u - c->u) * (a->v - b->v) - (a->u - b->u) * (a->v - c->v) ) >= 0;
+}
+
 void R_AliasPreparePoints (void)
 {
 	int			i;
@@ -294,6 +307,14 @@ void R_AliasPreparePoints (void)
 			if ( pfv[0]->flags & pfv[1]->flags & pfv[2]->flags )
 				continue;		// completely clipped
 
+			// WarpQuake: an unclipped triangle that R_DrawTriangle would not
+			// draw (back-facing, or with a zero-length edge: d_xdenom >= 0)
+			// is skipped before its s/t are written; every triangle writes
+			// its own before it uses them, so nothing else sees the difference
+			if ( ! (pfv[0]->flags | pfv[1]->flags | pfv[2]->flags) &&
+				 R_AliasTriangleHidden (pfv[2], pfv[1], pfv[0]) )
+				continue;
+
 			// insert s/t coordinates
 			pfv[0]->s = pstverts[ptri->index_st[0]].s << 16;
 			pfv[0]->t = pstverts[ptri->index_st[0]].t << 16;
@@ -328,6 +349,14 @@ void R_AliasPreparePoints (void)
 
 			if ( pfv[0]->flags & pfv[1]->flags & pfv[2]->flags )
 				continue;		// completely clipped
+
+			// WarpQuake: an unclipped triangle that R_DrawTriangle would not
+			// draw (back-facing, or with a zero-length edge: d_xdenom >= 0)
+			// is skipped before its s/t are written; every triangle writes
+			// its own before it uses them, so nothing else sees the difference
+			if ( ! (pfv[0]->flags | pfv[1]->flags | pfv[2]->flags) &&
+				 R_AliasTriangleHidden (pfv[0], pfv[1], pfv[2]) )
+				continue;
 
 			// insert s/t coordinates
 			pfv[0]->s = pstverts[ptri->index_st[0]].s << 16;
@@ -748,13 +777,24 @@ end_of_loop:
 	__asm jnz top_of_loop
 }
 #else
+// WarpQuake: a vertex's light depends only on its normal (one of
+// NUMVERTEXNORMALS) and on the model's lighting, so it is computed once per
+// normal per model, by the same expression, into r_lightcache
+static int	r_lightcache[NUMVERTEXNORMALS];
+static int	r_lightstamp[NUMVERTEXNORMALS];
+static int	r_lightframe;
+
 void R_AliasTransformFinalVerts( int numpoints, finalvert_t *fv, dtrivertx_t *oldv, dtrivertx_t *newv )
 {
 	int i;
+	// PMM - added double damage shell (WarpQuake: tested once, not per vertex)
+	qboolean	shell = ( currententity->flags & ( RF_SHELL_RED | RF_SHELL_GREEN | RF_SHELL_BLUE | RF_SHELL_DOUBLE | RF_SHELL_HALF_DAM) ) != 0;
+
+	r_lightframe++;
 
 	for ( i = 0; i < numpoints; i++, fv++, oldv++, newv++ )
 	{
-		int		temp;
+		int		temp, ln;
 		float	lightcos, *plightnormal;
 		vec3_t  lerped_vert;
 
@@ -762,10 +802,10 @@ void R_AliasTransformFinalVerts( int numpoints, finalvert_t *fv, dtrivertx_t *ol
 		lerped_vert[1] = r_lerp_move[1] + oldv->v[1]*r_lerp_backv[1] + newv->v[1]*r_lerp_frontv[1];
 		lerped_vert[2] = r_lerp_move[2] + oldv->v[2]*r_lerp_backv[2] + newv->v[2]*r_lerp_frontv[2];
 
-		plightnormal = r_avertexnormals[newv->lightnormalindex];
+		ln = newv->lightnormalindex;
+		plightnormal = r_avertexnormals[ln];
 
-		// PMM - added double damage shell
-		if ( currententity->flags & ( RF_SHELL_RED | RF_SHELL_GREEN | RF_SHELL_BLUE | RF_SHELL_DOUBLE | RF_SHELL_HALF_DAM) )
+		if ( shell )
 		{
 			lerped_vert[0] += plightnormal[0] * POWERSUIT_SCALE;
 			lerped_vert[1] += plightnormal[1] * POWERSUIT_SCALE;
@@ -779,20 +819,25 @@ void R_AliasTransformFinalVerts( int numpoints, finalvert_t *fv, dtrivertx_t *ol
 		fv->flags = 0;
 
 		// lighting
-		lightcos = DotProduct (plightnormal, r_plightvec);
-		temp = r_ambientlight;
-
-		if (lightcos < 0)
+		if (r_lightstamp[ln] != r_lightframe)
 		{
-			temp += (int)(r_shadelight * lightcos);
+			lightcos = DotProduct (plightnormal, r_plightvec);
+			temp = r_ambientlight;
 
-			// clamp; because we limited the minimum ambient and shading light, we
-			// don't have to clamp low light, just bright
-			if (temp < 0)
-				temp = 0;
+			if (lightcos < 0)
+			{
+				temp += (int)(r_shadelight * lightcos);
+
+				// clamp; because we limited the minimum ambient and shading light, we
+				// don't have to clamp low light, just bright
+				if (temp < 0)
+					temp = 0;
+			}
+			r_lightcache[ln] = temp;
+			r_lightstamp[ln] = r_lightframe;
 		}
 
-		fv->l = temp;
+		fv->l = r_lightcache[ln];
 
 		if ( fv->xyz[2] < ALIAS_Z_CLIP_PLANE )
 		{
