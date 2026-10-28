@@ -391,6 +391,87 @@ void R_AddDynamicLights (void)
 
 /*
 ===============
+R_DlightsReach
+
+WarpQuake2: whether any dynamic light marked on surf (R_MarkLights, which
+goes by the BSP planes and marks about three times as many surfaces as a
+light reaches in demo1) changes one of its lightmap samples.  If none
+does, its cache block is what it would build without them, and
+D_CacheSurface keeps it.
+
+R_AddDynamicLights' own test: its sample distance (the larger of |sd|,
+|td| plus half the smaller) grows with each of them, so the sample nearest
+the light in s and in t decides.  The comparisons lean toward "reaches"
+by a margin of 2 (and the radius test by 1), more than vbcc's rounding of
+these floats can move them (a value in a register is extended, in memory
+single): the answer may be yes where R_AddDynamicLights adds nothing,
+never no where it adds something.  A negative light (PGM) can change
+samples beyond its radius: it always counts.
+===============
+*/
+qboolean R_DlightsReach (msurface_t *surf)
+{
+	int			lnum, s, t, smax, tmax, sd, td, sdmin, tdmin;
+	float		dist, rad, minlight;
+	vec3_t		impact;
+	float		local[2];
+	mtexinfo_t	*tex = surf->texinfo;
+	dlight_t	*dl;
+	int			i;
+
+	smax = (surf->extents[0]>>4)+1;
+	tmax = (surf->extents[1]>>4)+1;
+
+	for (lnum=0 ; lnum<r_newrefdef.num_dlights ; lnum++)
+	{
+		if ( !(surf->dlightbits & (1<<lnum) ) )
+			continue;
+		dl = &r_newrefdef.dlights[lnum];
+		rad = dl->intensity;
+		if (rad < 0)
+			return true;
+		dist = DotProduct (dl->origin, surf->plane->normal) - surf->plane->dist;
+		rad -= fabs(dist);
+		minlight = 32;
+		if (rad < minlight - 1)
+			continue;
+		minlight = rad - minlight;
+		for (i=0 ; i<3 ; i++)
+			impact[i] = dl->origin[i] - surf->plane->normal[i]*dist;
+		local[0] = DotProduct (impact, tex->vecs[0]) + tex->vecs[0][3];
+		local[1] = DotProduct (impact, tex->vecs[1]) + tex->vecs[1][3];
+		local[0] -= surf->texturemins[0];
+		local[1] -= surf->texturemins[1];
+		tdmin = 0x7fffffff;
+		for (t = 0 ; t<tmax ; t++)
+		{
+			td = local[1] - t*16;
+			if (td < 0)
+				td = -td;
+			if (td < tdmin)
+				tdmin = td;
+		}
+		sdmin = 0x7fffffff;
+		for (s=0 ; s<smax ; s++)
+		{
+			sd = local[0] - s*16;
+			if (sd < 0)
+				sd = -sd;
+			if (sd < sdmin)
+				sdmin = sd;
+		}
+		if (sdmin > tdmin)
+			dist = sdmin + (tdmin>>1);
+		else
+			dist = tdmin + (sdmin>>1);
+		if (dist < minlight + 2)
+			return true;
+	}
+	return false;
+}
+
+/*
+===============
 R_BuildLightMap
 
 Combine and scale multiple lightmaps into the 8.8 format in blocklights
@@ -436,8 +517,9 @@ void R_BuildLightMap (void)
 			lightmap += size;	// skip to next lightmap
 		}
 
-// add all the dynamic lights
-	if (surf->dlightframe == r_framecount)
+// add all the dynamic lights (WarpQuake2: only if one reaches it; see
+// R_DlightsReach)
+	if (r_drawsurf.dlit)
 		R_AddDynamicLights ();
 
 // bound, invert, and shift

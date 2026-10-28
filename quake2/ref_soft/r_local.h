@@ -327,6 +327,7 @@ typedef struct
 	int                     surfmip;        // mipmapped ratio of surface texels / world pixels
 	int                     surfwidth;      // in mipmapped texels
 	int                     surfheight;     // in mipmapped texels
+	qboolean		dlit;			// WarpQuake2: a dynamic light reaches it (R_DlightsReach)
 } drawsurf_t;
 
 
@@ -783,6 +784,7 @@ void Draw_InitLocal (void);
 qboolean R_Init( void *hInstance, void *wndProc );
 void R_Shutdown (void);
 void R_InitCaches (void);
+qboolean R_DlightsReach (msurface_t *surf);
 void D_FlushCaches (void);
 
 void	R_ScreenShot_f( void );

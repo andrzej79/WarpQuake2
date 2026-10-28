@@ -683,7 +683,10 @@ surfcache_t *D_CacheSurface (msurface_t *surface, int miplevel)
 //
 	cache = surface->cachespots[miplevel];
 
-	if (cache && !cache->dlight && surface->dlightframe != r_framecount
+	// WarpQuake2: lit by a dynamic light only if one reaches a sample
+	r_drawsurf.dlit = (surface->dlightframe == r_framecount && R_DlightsReach (surface));
+
+	if (cache && !cache->dlight && !r_drawsurf.dlit
 			&& cache->image == r_drawsurf.image
 			&& cache->lightadj[0] == r_drawsurf.lightadj[0]
 			&& cache->lightadj[1] == r_drawsurf.lightadj[1]
@@ -712,10 +715,7 @@ surfcache_t *D_CacheSurface (msurface_t *surface, int miplevel)
 		cache->mipscale = surfscale;
 	}
 	
-	if (surface->dlightframe == r_framecount)
-		cache->dlight = 1;
-	else
-		cache->dlight = 0;
+	cache->dlight = r_drawsurf.dlit;
 
 	r_drawsurf.surfdat = (pixel_t *)cache->data;
 	

@@ -28,8 +28,8 @@ your own `baseq2/pak*.pak` next to the program.
 | build | ms/frame | fps |
 |---|---:|---:|
 | v0: id's C, built with vbcc | 127.99 | 7.81 |
-| now, 8 bpp | 86.33 | 11.58 |
-| now, 16 bpp (`vid_bpp 16`) | 94.94 | 10.53 |
+| now, 8 bpp | 84.00 | 11.90 |
+| now, 16 bpp (`vid_bpp 16`) | 91.56 | 10.92 |
 
 The steps, each measured on its own:
 
@@ -54,6 +54,7 @@ The steps, each measured on its own:
 | particles in asm | 88.09 |
 | light styles and particles added inline | 87.76 |
 | frame copied to the screen with MOVE16 (`vid_blit -1` on a Warp) | 86.33 |
+| a surface marked by a dynamic light rebuilt only if the light reaches it | 84.00 |
 
 `sw_subdiv16 1` (the default) computes s and t exactly every 16 pixels, as id's x86 code did;
 id's C did it every 8 (its own FIXME says so). `sw_subdiv16 0` is the C's 8 again.
