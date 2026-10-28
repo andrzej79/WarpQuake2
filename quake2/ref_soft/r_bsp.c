@@ -452,6 +452,16 @@ int c_drawnode;
 R_RecursiveWorldNode
 ================
 */
+#if Q2_ASM
+// r_bsp060.s replaces R_RecursiveWorldNode and reads these at fixed offsets
+typedef char check_n_plane[(offsetof (mnode_t, plane) == 24 && offsetof (mnode_t, children) == 28) ? 1 : -1];
+typedef char check_n_surfs[(offsetof (mnode_t, firstsurface) == 36 && offsetof (mnode_t, numsurfaces) == 38) ? 1 : -1];
+typedef char check_l_area[(offsetof (mleaf_t, area) == 28 && offsetof (mleaf_t, firstmarksurface) == 32) ? 1 : -1];
+typedef char check_l_key[(offsetof (mleaf_t, nummarksurfaces) == 36 && offsetof (mleaf_t, key) == 40) ? 1 : -1];
+typedef char check_m_surfaces[(offsetof (model_t, surfaces) == 204 && sizeof (msurface_t) == 68) ? 1 : -1];
+typedef char check_rd_areabits[(offsetof (refdef_t, areabits) == 72) ? 1 : -1];
+typedef char check_contents[(CONTENTS_SOLID == 1 && CONTENTS_NODE == -1 && SURF_PLANEBACK == 2) ? 1 : -1];
+#else
 void R_RecursiveWorldNode (mnode_t *node, int clipflags)
 {
 	int			i, c, side, *pindex;
@@ -605,6 +615,7 @@ c_drawnode++;
 		R_RecursiveWorldNode (node->children[!side], clipflags);
 	}
 }
+#endif
 
 
 
