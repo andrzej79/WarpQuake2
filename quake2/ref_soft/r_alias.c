@@ -1117,6 +1117,86 @@ void R_AliasSetUpLerpData( dmdl_t *pmdl, float backlerp )
 	}
 }
 
+
+/*
+================
+R_AliasHidden
+
+WarpQuake2: true when every pixel the model could cover already has a nearer
+z than the model's nearest point, so that the polyset drawers, which test
+each pixel the same way ((zi >> 16) >= *pz), would write none of them.  The
+box is the lerped vertices' (move + old * backv + new * frontv, each byte
+0..255) in view space; a model with a corner behind the z clip plane, a
+weapon (depth hack) or a shell is never skipped.  Exact: the box only has to
+hold the model, and the margins only keep more models drawn.
+================
+*/
+static qboolean R_AliasHidden (void)
+{
+	int		i, j, x, y, x0, x1, y0, y1, zmax;
+	float	zimax = 0, umin = 1e9f, umax = -1e9f, vmin = 1e9f, vmax = -1e9f;
+	vec3_t	lo, hi, corner, v;
+	short	*pz;
+
+	if (currententity->flags & (RF_WEAPONMODEL | RF_DEPTHHACK | RF_SHELL_RED | RF_SHELL_GREEN |
+								RF_SHELL_BLUE | RF_SHELL_DOUBLE | RF_SHELL_HALF_DAM))
+		return false;
+	for (i = 0; i < 3; i++)
+	{
+		float	a = 255 * r_lerp_backv[i], b = 255 * r_lerp_frontv[i];
+
+		lo[i] = r_lerp_move[i] + (a < 0 ? a : 0) + (b < 0 ? b : 0);
+		hi[i] = r_lerp_move[i] + (a > 0 ? a : 0) + (b > 0 ? b : 0);
+	}
+	for (i = 0; i < 8; i++)
+	{
+		float	zi;
+
+		corner[0] = i & 1 ? hi[0] : lo[0];
+		corner[1] = i & 2 ? hi[1] : lo[1];
+		corner[2] = i & 4 ? hi[2] : lo[2];
+		for (j = 0; j < 3; j++)
+			v[j] = DotProduct (corner, aliastransform[j]) + aliastransform[j][3];
+		if (v[2] < ALIAS_Z_CLIP_PLANE)
+			return false;
+		zi = 1.0f / v[2];
+		if (zi > zimax)
+			zimax = zi;
+		{
+			float	u = v[0] * aliasxscale * zi + aliasxcenter;
+			float	w = v[1] * aliasyscale * zi + aliasycenter;
+
+			if (u < umin) umin = u;
+			if (u > umax) umax = u;
+			if (w < vmin) vmin = w;
+			if (w > vmax) vmax = w;
+		}
+	}
+	x0 = (int)umin - 2;
+	x1 = (int)umax + 2;
+	y0 = (int)vmin - 2;
+	y1 = (int)vmax + 2;
+	if (x0 < r_refdef.vrect.x)
+		x0 = r_refdef.vrect.x;
+	if (y0 < r_refdef.vrect.y)
+		y0 = r_refdef.vrect.y;
+	if (x1 > r_refdef.vrect.x + r_refdef.vrect.width - 1)
+		x1 = r_refdef.vrect.x + r_refdef.vrect.width - 1;
+	if (y1 > r_refdef.vrect.y + r_refdef.vrect.height - 1)
+		y1 = r_refdef.vrect.y + r_refdef.vrect.height - 1;
+	if (x0 > x1 || y0 > y1)
+		return false;	// the bbox check let it through: leave it to the drawers
+	zmax = ((int)(zimax * s_ziscale) >> 16) + 2;
+	for (y = y0; y <= y1; y++)
+	{
+		pz = d_pzbuffer + d_zwidth * y;
+		for (x = x0; x <= x1; x++)
+			if (pz[x] <= zmax)
+				return false;
+	}
+	return true;
+}
+
 /*
 ================
 R_AliasDrawModel
@@ -1283,6 +1363,12 @@ void R_AliasDrawModel (void)
 		s_ziscale = (float)0x8000 * (float)0x10000 * 3.0;
 	else
 		s_ziscale = (float)0x8000 * (float)0x10000;
+
+	if (r_aliascull->value && R_AliasHidden ())
+	{
+		Q2C_ADD (Q2C_ALIAS_HIDDEN, 1);
+		return;	// no left-handed weapon to undo: weapons are never hidden
+	}
 
 	R_AliasPreparePoints ();
 

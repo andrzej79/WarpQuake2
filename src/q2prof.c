@@ -316,6 +316,7 @@ static void Report(const char *logpath)
       (double)q2c_count[Q2C_ALIAS_MODELS] / frames, (double)q2c_count[Q2C_ALIAS_VERTS] / frames,
       (double)q2c_count[Q2C_ALIAS_TRIS] / frames, (double)q2c_count[Q2C_ALIAS_DRAWN] / frames,
       (double)q2c_count[Q2C_ALIAS_CLIPPED] / frames);
+  Out(f, "alias models hidden %8.1f  (the z-buffer covered their box)\n", (double)q2c_count[Q2C_ALIAS_HIDDEN] / frames);
   Out(f, "surface cache       %8.1f blocks, %.1f KB built\n", (double)q2c_count[Q2C_CACHE_BUILDS] / frames,
       q2c_count[Q2C_CACHE_BYTES] / 1024.0 / frames);
   Out(f, "particles           %8.1f\n", (double)q2c_count[Q2C_PARTICLES] / frames);

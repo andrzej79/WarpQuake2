@@ -573,6 +573,7 @@ extern cvar_t   *r_drawentities;
 extern cvar_t   *r_drawworld;
 extern cvar_t   *r_dspeeds;
 extern cvar_t   *r_lerpmodels;
+extern cvar_t   *r_aliascull;
 
 extern cvar_t   *r_speeds;
 

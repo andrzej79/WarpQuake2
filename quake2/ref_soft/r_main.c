@@ -129,6 +129,7 @@ cvar_t	*r_drawentities;
 cvar_t	*r_dspeeds;
 cvar_t	*r_fullbright;
 cvar_t  *r_lerpmodels;
+cvar_t  *r_aliascull;	// WarpQuake2: skip models the z-buffer hides (R_AliasHidden)
 cvar_t  *r_novis;
 
 cvar_t	*r_speeds;
@@ -271,6 +272,7 @@ void R_Register (void)
 	r_dspeeds = ri.Cvar_Get ("r_dspeeds", "0", 0);
 	r_lightlevel = ri.Cvar_Get ("r_lightlevel", "0", 0);
 	r_lerpmodels = ri.Cvar_Get( "r_lerpmodels", "1", 0 );
+	r_aliascull = ri.Cvar_Get( "r_aliascull", "1", 0 );
 	r_novis = ri.Cvar_Get( "r_novis", "0", 0 );
 
 	vid_fullscreen = ri.Cvar_Get( "vid_fullscreen", "0", CVAR_ARCHIVE );

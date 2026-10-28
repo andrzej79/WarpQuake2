@@ -147,7 +147,10 @@ sfxcache_t *S_LoadSound (sfx_t *s)
 	stepscale = (float)info.rate / dma.speed;	
 	len = info.samples / stepscale;
 
-	len = len * info.width * info.channels;
+	// WarpQuake2: what ResampleSfx writes - mono, one byte a sample with
+	// s_loadas8bit (the default).  id allocated at the file's width and
+	// channels, which left half of every 16-bit sound unused.
+	len = len * (s_loadas8bit->value ? 1 : info.width);
 
 	sc = s->cache = Z_Malloc (len + sizeof(sfxcache_t));
 	if (!sc)

@@ -46,6 +46,7 @@ vrect_t		scr_vrect;		// position of render window on screen
 
 
 cvar_t		*scr_viewsize;
+cvar_t		*scr_hudbar;	// WarpQuake2: the HUD on a black bar, the view above it
 cvar_t		*scr_conspeed;
 cvar_t		*scr_centertime;
 cvar_t		*scr_showturtle;
@@ -314,6 +315,13 @@ SCR_CalcVrect
 Sets scr_vrect, the coordinates of the rendered window
 =================
 */
+#define HUDBAR_LINES	24
+
+static int SCR_HudBarLines (void)
+{
+	return scr_hudbar->value && cl.cinematictime <= 0 ? HUDBAR_LINES : 0;
+}
+
 static void SCR_CalcVrect (void)
 {
 	int		size;
@@ -329,11 +337,13 @@ static void SCR_CalcVrect (void)
 	scr_vrect.width = viddef.width*size/100;
 	scr_vrect.width &= ~7;
 
-	scr_vrect.height = viddef.height*size/100;
+	// WarpQuake2: with scr_hudbar the status bar's row (the layouts' "yb -24")
+	// is not part of the view - fewer pixels to render
+	scr_vrect.height = (viddef.height - SCR_HudBarLines ())*size/100;
 	scr_vrect.height &= ~1;
 
 	scr_vrect.x = (viddef.width - scr_vrect.width)/2;
-	scr_vrect.y = (viddef.height - scr_vrect.height)/2;
+	scr_vrect.y = (viddef.height - SCR_HudBarLines () - scr_vrect.height)/2;
 }
 
 
@@ -409,6 +419,7 @@ SCR_Init
 void SCR_Init (void)
 {
 	scr_viewsize = Cvar_Get ("viewsize", "100", CVAR_ARCHIVE);
+	scr_hudbar = Cvar_Get ("scr_hudbar", "1", CVAR_ARCHIVE);
 	scr_conspeed = Cvar_Get ("scr_conspeed", "3", 0);
 	scr_showturtle = Cvar_Get ("scr_showturtle", "0", 0);
 	scr_showpause = Cvar_Get ("scr_showpause", "1", 0);
@@ -1378,6 +1389,8 @@ void SCR_UpdateScreen (void)
 				Q2P_END (Q2P_CLVIEW);
 			}
 
+			if (SCR_HudBarLines ())
+				re.DrawFill (0, viddef.height - HUDBAR_LINES, viddef.width, HUDBAR_LINES, 0);
 			SCR_DrawStats ();
 			if (cl.frame.playerstate.stats[STAT_LAYOUTS] & 1)
 				SCR_DrawLayout ();

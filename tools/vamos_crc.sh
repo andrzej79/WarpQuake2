@@ -21,5 +21,5 @@ cp "$BIN" "$W/WarpQuake2"
 rm -f "$W/crc.txt" "$W/warpq2/config.cfg"	# from the defaults every time
 cd "$W"
 "$VAMOS" -C 68040 -s 1200 -m 262144 -H disable -V work:"$W" -- work:WarpQuake2 -headless -benchmark -crc \
-  -crcfile work:crc.txt "$@" +set basedir work: +set game warpq2 +set fixedtime 100 +set timedemo 1 \
+  -crcfile work:crc.txt "$@" +set basedir work: +set game warpq2 +set fixedtime 100 +set scr_hudbar 0 +set timedemo 1 \
   +demomap ${DEMO:-demo1}.dm2 2>&1 | grep -a 'Q2BENCH\|rror'

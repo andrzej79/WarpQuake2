@@ -29,8 +29,9 @@ your own `baseq2/pak*.pak` next to the program.
 | build | ms/frame | fps |
 |---|---:|---:|
 | v0: id's C, built with vbcc | 127.99 | 7.81 |
-| now, 8 bpp | 84.00 | 11.90 |
-| now, 16 bpp (`vid_bpp 16`) | 91.56 | 10.92 |
+| now, 8 bpp | 79.98 | 12.50 |
+| now, 16 bpp (`vid_bpp 16`) | 87.86 | 11.38 |
+| now, 8 bpp, HUD on a black bar (`scr_hudbar 1`, the default; below) | 75.89 | 13.18 |
 
 The steps, each measured on its own:
 
@@ -56,6 +57,7 @@ The steps, each measured on its own:
 | light styles and particles added inline | 87.76 |
 | frame copied to the screen with MOVE16 (`vid_blit -1` on a Warp) | 86.33 |
 | a surface marked by a dynamic light rebuilt only if the light reaches it | 84.00 |
+| alias models the z-buffer already hides skipped (`r_aliascull`, below) | 79.98 |
 
 `sw_subdiv16 1` (the default) computes s and t exactly every 16 pixels, as id's x86 code did;
 id's C did it every 8 (its own FIXME says so). `sw_subdiv16 0` is the C's 8 again.
@@ -65,6 +67,11 @@ about 100 ns when the FPGA's 96 KB L2 has it and 600-800 ns when it comes from D
 frame (77 KB), the z-buffer (150 KB) and the surface cache's texels do not fit. Byte stores
 to fast RAM run at about 21 ns, longwords at 15 ns a byte; to the RTG screen bytes take 67 ns,
 so rendering straight into it would cost more than the 2.1 ms `WriteChunkyPixels` takes.
+
+`r_aliascull 1` (the default) skips an alias model when every z-buffer entry in the screen
+rectangle of its box is nearer than the box's nearest point: the drawers' own per-pixel test,
+so nothing they would have drawn is lost, and the CRCs are unchanged. Quake II draws every model
+in the potentially visible set, and in demo1 about one in five is behind a wall.
 
 Tried and dropped: WarpQuake's z coverage (write z only where something reads it). Quake II's
 weapon and particles cover so much of the view that it cut the z writes by a quarter, 1.3 ms,
@@ -94,6 +101,16 @@ installation and keep its own settings in a game directory of their own:
 WarpQuake2 +set basedir Work:Games/Quake2 +set game warpq2
 ```
 
+**Video options** (Options, Video): the mode, the colour depth, the screen size, the
+brightness and the HUD bar, set on "apply". The modes are id's `sw_mode` 0-4 (320x240,
+400x300, 512x384, 640x480, 800x600) and 5, 640x360; nothing larger, which a 68060 cannot render
+at a playable rate. A mode the RTG board does not have exactly is centred on the nearest
+larger one.
+
+**`scr_hudbar`** (saved, default 1) stops the 3D view above the status bar's row (health, ammo,
+armour) and fills that row black: 24 lines fewer to render, about 4 ms a frame at 320x240.
+`scr_hudbar 0` draws the status bar over the view, as id's game does.
+
 **16 bpp.** `vid_bpp 16` (saved; `+set vid_bpp 16` on the command line) opens a 16-bit RTG
 mode instead of a CLUT one, falling back to 8 bits if there is none. The renderer then draws
 RGB565 pixels: the lighting goes through a 16-bit colormap built with the formula id's
@@ -121,7 +138,10 @@ sound costs about 1.8 ms a frame (1.0 in Quake II's mixer, the rest in AHI's).
 
 Engine bug fixed here: id's C mixer took the volume row of its scale table as `vol >> 11`
 (always row 0, all zeros) where its x86 code used `vol >> 3`, so every 8-bit sound - all of
-them, at the default `s_loadas8bit 1` - was silent (`snd_mix.c`).
+them, at the default `s_loadas8bit 1` - was silent (`snd_mix.c`). And `S_LoadSound` allocated
+each sound at its file's sample width and channels, though it stores mono, one byte a sample
+at `s_loadas8bit 1`: half of every 16-bit sound was never used, 3.6 MB at 22 kHz in base1
+(`snd_mem.c`).
 
 A timedemo:
 
@@ -159,7 +179,7 @@ a per-instruction histogram of one asm function.
 host, in about 40 s: no task switches, no interrupts, and 80-bit floats computed exactly as the
 060 does, so its CRCs are exactly reproducible (`DEMO=demo2` for the other demo). `ASM=0` and
 `ASM=1` must print the same CRC. Now: `0380799c` (demo1, 320x240, `sw_subdiv16 1`) and
-`2d5bb708` (demo2); `sw_subdiv16 0` gives a different one, again the same for both builds.
+`2d5bb708` (demo2), with `scr_hudbar 0`, which the script sets; `sw_subdiv16 0` gives a different one, again the same for both builds.
 
 **16 bpp** (`+set vid_bpp 16`) is checked with `-rgbtest`: the colour tables then hold the
 8-bit renderer's palette indexes and the blends go through its alphamap, so the low byte of

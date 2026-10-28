@@ -67,6 +67,7 @@ typedef enum {
   Q2C_ALIAS_TRIS,   // ... their triangles not completely clipped
   Q2C_ALIAS_DRAWN,  // ... of those, unclipped and front-facing (to R_DrawTriangle)
   Q2C_ALIAS_CLIPPED,// ... and partly clipped (to R_AliasClipTriangle)
+  Q2C_ALIAS_HIDDEN, // models skipped: the z-buffer covers all of their box
   Q2C_COUNT
 } q2p_counter_t;
 

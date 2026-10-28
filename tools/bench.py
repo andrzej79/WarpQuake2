@@ -77,6 +77,7 @@ def main():
     ap.add_argument('--mode', default='0')
     ap.add_argument('--bpp', default='8')
     ap.add_argument('--sound', action='store_true')
+    ap.add_argument('--hudbar', action='store_true')   # the CRCs are without it
     ap.add_argument('--limit', type=int, default=400)
     ap.add_argument('--verbose', '-v', action='store_true')
     ap.add_argument('extra', nargs='*')
@@ -104,8 +105,8 @@ def main():
     # extra arguments up to the first '+' are options (-crcfile RAM:x), the rest commands
     first_plus = next((i for i, x in enumerate(a.extra) if x.startswith('+')), len(a.extra))
     dash += a.extra[:first_plus]
-    plus = ['+set basedir %s +set game warpq2 +set fixedtime 100 +set sw_mode %s +set vid_bpp %s +set s_initsound %d' %
-            (basedir, a.mode, a.bpp, 1 if a.sound else 0)]
+    plus = ['+set basedir %s +set game warpq2 +set fixedtime 100 +set sw_mode %s +set vid_bpp %s +set s_initsound %d +set scr_hudbar %d' %
+            (basedir, a.mode, a.bpp, 1 if a.sound else 0, 1 if a.hudbar else 0)]
     plus += a.extra[first_plus:]
     plus += ['+set timedemo 1 +demomap %s' % a.demo]
     cmdline = '%s %s %s' % (a.name, ' '.join(dash), ' '.join(plus))
