@@ -17,7 +17,7 @@ W=$ROOT/temp/vw
 mkdir -p "$W/warpq2"
 [ -e "$W/baseq2" ] || ln -s "$ROOT/baseq2" "$W/baseq2"
 cp "$BIN" "$W/WarpQuake2"
-rm -f "$W/crc.txt"
+rm -f "$W/crc.txt" "$W/warpq2/config.cfg"	# from the defaults every time
 cd "$W"
 "$VAMOS" -C 68040 -s 1200 -m 262144 -H disable -V work:"$W" -- work:WarpQuake2 -headless -benchmark -crc \
   -crcfile work:crc.txt "$@" +set basedir work: +set game warpq2 +set fixedtime 100 +set timedemo 1 \

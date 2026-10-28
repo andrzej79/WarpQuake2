@@ -52,7 +52,7 @@ float	aliastransform[3][4];
 float   aliasworldtransform[3][4];
 float   aliasoldworldtransform[3][4];
 
-static float	s_ziscale;
+float	s_ziscale;		// not static: r_alias060.s reads it
 static vec3_t	s_alias_forward, s_alias_right, s_alias_up;
 
 
@@ -777,6 +777,16 @@ end_of_loop:
 	__asm jnz top_of_loop
 }
 #else
+#if Q2_ASM
+// r_alias060.s reads these at fixed offsets
+typedef char check_aliasvrect_x[(offsetof (oldrefdef_t, aliasvrect) + offsetof (vrect_t, x) == 20) ? 1 : -1];
+typedef char check_aliasvrect_y[(offsetof (oldrefdef_t, aliasvrect) + offsetof (vrect_t, y) == 24) ? 1 : -1];
+typedef char check_aliasvrectright[(offsetof (oldrefdef_t, aliasvrectright) == 48) ? 1 : -1];
+typedef char check_aliasvrectbottom[(offsetof (oldrefdef_t, aliasvrectbottom) == 52) ? 1 : -1];
+typedef char check_fv_size[(sizeof (finalvert_t) == 40 && offsetof (finalvert_t, xyz) == 28) ? 1 : -1];
+typedef char check_shell[((RF_SHELL_RED | RF_SHELL_GREEN | RF_SHELL_BLUE | RF_SHELL_DOUBLE | RF_SHELL_HALF_DAM) == 0x31c00) ? 1 : -1];
+typedef char check_scales[(ALIAS_Z_CLIP_PLANE == 4 && POWERSUIT_SCALE == 4.0F) ? 1 : -1];
+#else	// r_alias060.s
 // WarpQuake: a vertex's light depends only on its normal (one of
 // NUMVERTEXNORMALS) and on the model's lighting, so it is computed once per
 // normal per model, by the same expression, into r_lightcache
@@ -849,6 +859,7 @@ void R_AliasTransformFinalVerts( int numpoints, finalvert_t *fv, dtrivertx_t *ol
 		}
 	}
 }
+#endif
 
 #endif
 

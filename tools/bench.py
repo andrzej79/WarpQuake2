@@ -51,6 +51,15 @@ def run(runner, cmdline, limit):
     return p.stdout.decode('latin-1')
 
 
+def put_config(basedir):
+    """tools/bench_config.cfg as the game directory's config.cfg"""
+    tmp = os.path.join(ROOT, 'temp', 'upload')
+    os.makedirs(tmp, exist_ok=True)
+    shutil.copyfile(os.path.join(HERE, 'bench_config.cfg'), os.path.join(tmp, 'config.cfg'))
+    subprocess.run([sys.executable, os.path.join(HERE, 'amiput.py'), os.path.join(tmp, 'config.cfg'), '-d',
+                    basedir + '/warpq2'], check=True, stdout=subprocess.DEVNULL)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--name', default='WarpQuake2')
@@ -96,6 +105,10 @@ def main():
 
     results = []
     for i in range(a.runs):
+        # from the defaults every time: archived cvars an earlier run set
+        # (sw_subdiv16 0, say) would carry over in its config.cfg, and
+        # without one "exec config.cfg" finds baseq2's
+        put_config(basedir)
         out = run(runner, cmdline, a.limit)
         m = re.search(r'Q2BENCH frames=(\d+) ms=(\d+) ms_per_frame=([\d.]+) fps=([\d.]+) crc=([0-9a-f]+)', out)
         if a.verbose or not m:
