@@ -1,9 +1,10 @@
 ; r_scan060.s -- the world span and z-span drawers for the 68060
 ;
-; D_DrawSpans16 and D_DrawZSpans (below), replacing the C versions in r_scan.c (built with Q2_ASM=1,
+; D_DrawSpans8, D_DrawSpans16 and D_DrawZSpans, replacing the C versions in r_scan.c (built with Q2_ASM=1,
 ; the default).  It is WarpQuake's D_DrawSpans8 (its d_spans060.s, the generic
 ; SpanDrawer body), because Quake II's D_DrawSpans16 is Quake's D_DrawSpans8
-; operation for operation: 8-pixel blocks despite the name.  It must draw
+; operation for operation: 8-pixel blocks despite the name, so it is D_DrawSpans8
+; here; D_DrawSpans16 below is WarpQuake's 16-pixel one (sw_subdiv16 1).  It must draw
 ; exactly what the C draws (tools/vamos_crc.sh checks it frame by frame), so
 ; the floating-point part repeats vbcc's code for the C operation for
 ; operation, and only the scheduling and the integer side are new.
@@ -52,6 +53,7 @@ PIX16	equ	0				; WarpQuake's 16 bpp build of the same body: not used here
 	xref	_bbextentt
 	xref	_q2c_count			; unsigned long[]: q2prof.h work counters
 
+	xdef	_D_DrawSpans8
 	xdef	_D_DrawSpans16
 	xdef	_D_DrawZSpans
 
@@ -427,8 +429,649 @@ SpanDrawer	macro
 	endm
 
 	cnop	0,4
-_D_DrawSpans16
+_D_DrawSpans8
 	SpanDrawer	8,3,$41000000
+
+;------------------------------------------------------------------------------
+; void D_DrawSpans16 (espan_t *pspan)
+;
+; SpanDrawer's algorithm for N = 16, with the float work software
+; pipelined.  The 68060's FPU is not pipelined and SpanDrawer issued a
+; block's float work back to back - s and t at its far end (8 FPU
+; operations), then the next divide's setup (5, 11, or 22 for the next
+; span) - while the integer pipes idled; the pixels after it are pure
+; integer.  That was ~5 ms of the ~11.5 a frame spent here (hardware
+; profile, 2026-10-04).
+;
+; Here a full 16-pixel block (any block but a span's last) carries the NEXT
+; block's float work in its pixel loop, one FPU operation between pixels:
+; first that block's far-end s and t (A, from the divide issued during
+; this block's predecessor), then the divide after it (C: a middle block's,
+; a last block's, or the next span's start).  The operations and their
+; order are SpanDrawer's - only their placement moved - so the result is
+; the same, bit for bit; -crc checks it.  A span's first block and its last
+; block (entered part-way into the unrolled loop, so it cannot carry
+; anything) still do their float work in line.
+;
+; Registers as in SpanDrawer.  A span's first block and the later ones take
+; separate paths (the later ones' next float work is already done, in the
+; previous block's loop); d4, d5, d7 carry PixStart's results across the
+; block-end code.
+;------------------------------------------------------------------------------
+
+; Pixel-loop setup (SpanDrawer's, see the register list there), in two
+; halves.  PixStart needs only s (a4) and t (a6), so it runs while a span's
+; first divide does - the A after it would otherwise wait the FDIV out:
+;   d7 = the first texel offset, d4 = s << 16, d5 = t << 16
+PixStart	macro
+	move.l	a6,d7
+	clr.w	d7
+	swap	d7
+	mulu.w	_cachewidth+2,d7		; (t >> 16) * cachewidth; s, t >= 0
+	move.l	a4,d0
+	clr.w	d0
+	swap	d0
+	add.l	d0,d7				; + (s >> 16)
+	move.l	a4,d4
+	swap	d4
+	clr.w	d4				; s << 16
+	move.l	a6,d5
+	swap	d5
+	clr.w	d5				; t << 16
+	endm
+
+; PixEnd: the rest, once the steps are known (d2, d3).  Uses d0, d1.
+PixEnd	macro
+	move.l	d2,d0
+	swap	d0
+	ext.l	d0				; sstep >> 16, signed
+	move.l	d3,d1
+	swap	d1
+	ext.l	d1				; tstep >> 16, signed
+	muls.l	_cachewidth,d1
+	add.l	d1,d0
+	swap	d2
+	clr.w	d2				; sstep << 16
+	swap	d3
+	clr.w	d3				; tstep << 16
+	move.l	d2,a4
+	move.l	d3,a6
+	move.l	d4,d2				; s << 16
+	move.l	d5,d3				; t << 16
+	move.l	d0,d4				; (sstep >> 16) + (tstep >> 16) * cachewidth
+	move.l	_cachewidth,d5
+	move.l	d7,d0				; whichever role the entry pixel has
+	move.l	d7,d1
+	endm
+
+; BlockEnd last: clamp this block's far end (d2, d3 before the adjustment),
+; keep it (a2, v_tnext) and step to it - by shifting for a full block, which
+; falls through with d6 = 16 and a3 = the pixels left after it; the span's
+; last block goes to \1 with d6 = its length.
+BlockEnd	macro
+	add.l	_sadjust,d2
+	add.l	_tadjust,d3
+	ClampEnd	d2,_bbextents
+	ClampEnd	d3,_bbextentt
+	move.l	d2,a2				; snext
+	move.l	d3,v_tnext
+	sub.l	a4,d2				; snext - s
+	sub.l	a6,d3				; tnext - t
+	move.l	a3,d6
+	moveq	#16,d0
+	cmp.l	d0,d6
+	ble	\1
+	moveq	#16,d6
+	asr.l	#4,d2
+	asr.l	#4,d3
+	sub.l	d6,a3				; r = pixels left after this block
+	endm
+
+; LastSteps: the span's last block (n = d6 <= 16): (snext - s) / (n-1) on
+; the FPU as SpanDrawer does (see recip_up).  Uses d0, a0, fp0, fp1.
+LastSteps	macro
+	move.l	d6,d0
+	subq.l	#1,d0
+	beq	.ls\@				; one pixel: the steps are never used
+	mulu.w	#12,d0				; an extended is 12 bytes
+	lea	recip_up-12,a0
+	fmove.x	(a0,d0.l),fp1
+	fmove.l	d2,fp0
+	fmul.x	fp1,fp0
+	fintrz.x	fp0
+	fmove.l	fp0,d2
+	fmove.l	d3,fp0
+	fmul.x	fp1,fp0
+	fintrz.x	fp0
+	fmove.l	fp0,d3
+.ls\@
+	endm
+
+	cnop	0,4
+	if PIX16
+_D_DrawSpansRGB
+	else
+_D_DrawSpans16
+	endif
+	movem.l	d2-d7/a2-a6,-(sp)
+	fmovem.x	fp2-fp7,-(sp)
+	move.l	4+SAVED_INT+SAVED_FP(sp),a2
+	move.l	a2,v_pspan
+	move.l	_cacheblock,a5
+	fmove.s	#$47800000,fp4			; 65536.0: z is prescaled to 16.16
+
+	; the 16-pixel steps, rounded to float as the C's locals are
+	fmove.s	_d_sdivzstepu,fp0
+	fmul.s	#$41800000,fp0
+	fmove.s	fp0,v_sdivzn
+	fmove.s	_d_tdivzstepu,fp0
+	fmul.s	#$41800000,fp0
+	fmove.s	fp0,v_tdivzn
+	fmove.s	_d_zistepu,fp0
+	fmul.s	#$41800000,fp0
+	fmove.s	fp0,v_zin
+
+	SpanFP	a2
+
+.span
+	; A span's start: s and t at its first pixel, its first block's divide
+	; and far end, and the block-end setup - SpanDrawer's float and integer
+	; work, hand-scheduled so the integer work (which does not depend on
+	; the float results it sits between) runs while the FPU computes.
+	move.l	SPAN_COUNT(a2),d0
+	move.l	d0,a3
+	; s at the first pixel (FixedAtZ), with pdest and the counters
+	fmove.x	fp3,fp0
+	move.l	_r_screenwidth,d1
+	fmul.x	fp6,fp0
+	muls.l	SPAN_V(a2),d1
+	fintrz.x	fp0
+	move.l	_d_viewbuffer,a1
+	if PIX16
+	add.l	SPAN_U(a2),d1
+	add.l	d1,d1				; 2 bytes a pixel
+	add.l	d1,a1
+	else
+	add.l	d1,a1
+	add.l	SPAN_U(a2),a1
+	endif
+	fmove.l	fp0,d0
+	move.l	a3,d1
+	add.l	d1,_q2c_count+Q2C_SPAN_PIXELS
+	; t (FixedAtZ, in fp1), with s clamped to 0 .. bbextents
+	fmove.x	fp3,fp1
+	add.l	_sadjust,d0
+	addq.l	#1,_q2c_count+Q2C_SPANS
+	fmul.x	fp5,fp1
+	cmp.l	_bbextents,d0
+	ble	.s_lo
+	move.l	_bbextents,d0
+	bra	.s_ok
+.s_lo
+	tst.l	d0
+	bge	.s_ok
+	moveq	#0,d0
+.s_ok
+	move.l	d0,a4
+	fintrz.x	fp1
+	move.l	SPAN_NEXT(a2),v_nextspan
+	fmove.l	fp1,d0
+	add.l	_tadjust,d0
+	cmp.l	_bbextentt,d0
+	ble	.t_lo
+	move.l	_bbextentt,d0
+	bra	.t_ok
+.t_lo
+	tst.l	d0
+	bge	.t_ok
+	moveq	#0,d0
+.t_ok
+	move.l	d0,a6
+
+	; the first block's divide (StartDiv): a full block, or the span's last
+	move.l	a3,d1
+	moveq	#16,d0
+	cmp.l	d0,d1
+	ble	.c0last
+	fadd.s	v_sdivzn,fp6
+	fadd.s	v_tdivzn,fp5
+	fadd.s	v_zin,fp2
+	fmove.x	fp4,fp3
+	fdiv.x	fp2,fp3
+	; While it runs: the next span's record into the cache (its u and v are
+	; read later; loads block on the 68060, but this one overlaps the
+	; divide), and which loop the first block will run (from the count; as
+	; .select does from what is left after a block).
+	move.l	v_nextspan,d0
+	beq	.nopf
+	move.l	d0,a0
+	tst.b	(a0)
+.nopf
+	move.l	a3,d0
+	sub.l	#16,d0				; pixels left after the first block
+	cmp.l	#16,d0
+	ble	.fnextlast
+	sub.l	#16,d0
+	cmp.l	#16,d0
+	bgt	.fselmid
+	subq.l	#1,d0
+	move.l	d0,v_lastn
+	lea	.vlast(pc),a0
+	bra	.fsel
+.fselmid
+	lea	.vmid(pc),a0
+	bra	.fsel
+.fnextlast
+	lea	.vend(pc),a0
+	tst.l	v_nextspan
+	beq	.fsel
+	lea	.vspan(pc),a0
+.fsel
+	; the first block's far end (A), with PixStart between
+	fmove.x	fp3,fp0
+	move.l	a6,d7
+	clr.w	d7
+	fmove.x	fp3,fp1
+	swap	d7
+	mulu.w	_cachewidth+2,d7
+	fmul.x	fp6,fp0
+	move.l	a4,d0
+	clr.w	d0
+	fmul.x	fp5,fp1
+	swap	d0
+	fintrz.x	fp0
+	add.l	d0,d7
+	move.l	a4,d4
+	fintrz.x	fp1
+	swap	d4
+	clr.w	d4
+	fmove.l	fp0,d2
+	move.l	a6,d5
+	swap	d5
+	fmove.l	fp1,d3
+	clr.w	d5
+	BlockEnd	.lastfirst		; (a full block: falls through)
+	; the second block's divide (StartDiv, kind by what is left: d6 free
+	; until the loop), with PixEnd between
+	move.l	a3,d6
+	cmp.l	#16,d6
+	ble	.c1last
+	fadd.s	v_sdivzn,fp6
+	move.l	d2,d0
+	swap	d0
+	ext.l	d0
+	move.l	d3,d1
+	fadd.s	v_tdivzn,fp5
+	swap	d1
+	ext.l	d1
+	muls.l	_cachewidth,d1
+	add.l	d1,d0
+	fadd.s	v_zin,fp2
+	swap	d2
+	clr.w	d2
+	swap	d3
+	clr.w	d3
+	fmove.x	fp4,fp3
+	move.l	d2,a4
+	move.l	d3,a6
+	move.l	d4,d2
+	move.l	d5,d3
+	fdiv.x	fp2,fp3
+	move.l	d0,d4
+	move.l	_cachewidth,d5
+	move.l	d7,d0
+	move.l	d7,d1
+	jmp	(a0)
+.c1last
+	subq.l	#1,d6
+	fmove.l	d6,fp0
+	move.l	d2,d0
+	swap	d0
+	fmove.s	_d_sdivzstepu,fp1
+	ext.l	d0
+	move.l	d3,d1
+	fmul.x	fp0,fp1
+	swap	d1
+	ext.l	d1
+	fadd.x	fp1,fp6
+	muls.l	_cachewidth,d1
+	add.l	d1,d0
+	fmove.s	_d_tdivzstepu,fp1
+	swap	d2
+	clr.w	d2
+	fmul.x	fp0,fp1
+	swap	d3
+	fadd.x	fp1,fp5
+	clr.w	d3
+	move.l	d2,a4
+	fmul.s	_d_zistepu,fp0
+	move.l	d3,a6
+	move.l	d4,d2
+	fadd.x	fp0,fp2
+	move.l	d5,d3
+	move.l	d0,d4
+	fmove.x	fp4,fp3
+	move.l	_cachewidth,d5
+	move.l	d7,d0
+	fdiv.x	fp2,fp3
+	move.l	d7,d1
+	jmp	(a0)
+
+.c0last
+	subq.l	#1,d1
+	fmove.l	d1,fp0
+	fmove.s	_d_sdivzstepu,fp1
+	fmul.x	fp0,fp1
+	fadd.x	fp1,fp6
+	fmove.s	_d_tdivzstepu,fp1
+	fmul.x	fp0,fp1
+	fadd.x	fp1,fp5
+	fmul.s	_d_zistepu,fp0
+	fadd.x	fp0,fp2
+	fmove.x	fp4,fp3
+	fdiv.x	fp2,fp3
+	move.l	v_nextspan,d0
+	beq	.nopf2
+	move.l	d0,a0
+	tst.b	(a0)
+.nopf2
+	; the (only) block's far end (A), with PixStart between
+	fmove.x	fp3,fp0
+	move.l	a6,d7
+	clr.w	d7
+	fmove.x	fp3,fp1
+	swap	d7
+	mulu.w	_cachewidth+2,d7
+	fmul.x	fp6,fp0
+	move.l	a4,d0
+	clr.w	d0
+	fmul.x	fp5,fp1
+	swap	d0
+	fintrz.x	fp0
+	add.l	d0,d7
+	move.l	a4,d4
+	fintrz.x	fp1
+	swap	d4
+	clr.w	d4
+	fmove.l	fp0,d2
+	move.l	a6,d5
+	swap	d5
+	fmove.l	fp1,d3
+	clr.w	d5
+	BlockEnd	.lastfirst		; (always taken: the span's last block)
+
+.after
+	; s, t = this block's far end; the next block's A is in v_sraw/v_traw
+	move.l	a2,a4
+	move.l	v_tnext,a6
+	PixStart
+	move.l	v_sraw,d2
+	move.l	v_traw,d3
+	BlockEnd	.lastlater
+
+.select
+	; which loop: the next block is full (r > 16) or the last; the one
+	; after it is full, the last (its count - 1 into v_lastn), or the next
+	; span's start
+	move.l	a3,d0
+	cmp.l	#16,d0
+	ble	.nextlast
+	sub.l	#16,d0				; pixels left after the next block
+	cmp.l	#16,d0
+	bgt	.selmid
+	subq.l	#1,d0
+	move.l	d0,v_lastn
+	lea	.vlast(pc),a0
+	bra	.selected
+.selmid
+	lea	.vmid(pc),a0
+	bra	.selected
+.nextlast
+	lea	.vend(pc),a0
+	tst.l	v_nextspan
+	beq	.selected
+	lea	.vspan(pc),a0
+.selected
+	PixEnd
+	jmp	(a0)
+
+;  next block full, the one after it full: A, then its divide
+.vmid
+	Pixel	d0,d1
+	fmove.x	fp3,fp0
+	Pixel	d1,d0
+	fmove.x	fp3,fp1
+	Pixel	d0,d1
+	fmul.x	fp6,fp0
+	Pixel	d1,d0
+	fmul.x	fp5,fp1
+	Pixel	d0,d1
+	fintrz.x	fp0
+	Pixel	d1,d0
+	fintrz.x	fp1
+	Pixel	d0,d1
+	fmove.l	fp0,v_sraw
+	Pixel	d1,d0
+	fmove.l	fp1,v_traw
+	Pixel	d0,d1
+	fadd.s	v_sdivzn,fp6
+	Pixel	d1,d0
+	fadd.s	v_tdivzn,fp5
+	Pixel	d0,d1
+	fadd.s	v_zin,fp2
+	Pixel	d1,d0
+	Pixel	d0,d1
+	fmove.x	fp4,fp3
+	Pixel	d1,d0
+	fdiv.x	fp2,fp3
+	Pixel	d0,d1
+	Pixel	d1,d0
+	bra	.after
+
+;  next block full, the one after it the last: A, then its divide
+.vlast
+	Pixel	d0,d1
+	fmove.x	fp3,fp0
+	Pixel	d1,d0
+	fmove.x	fp3,fp1
+	Pixel	d0,d1
+	fmul.x	fp6,fp0
+	Pixel	d1,d0
+	fmul.x	fp5,fp1
+	Pixel	d0,d1
+	fintrz.x	fp0
+	Pixel	d1,d0
+	fintrz.x	fp1
+	Pixel	d0,d1
+	fmove.l	fp0,v_sraw
+	Pixel	d1,d0
+	fmove.l	fp1,v_traw
+	Pixel	d0,d1
+	fmove.l	v_lastn,fp0
+	fmove.s	_d_sdivzstepu,fp1
+	Pixel	d1,d0
+	fmul.x	fp0,fp1
+	fadd.x	fp1,fp6
+	Pixel	d0,d1
+	fmove.s	_d_tdivzstepu,fp1
+	Pixel	d1,d0
+	fmul.x	fp0,fp1
+	fadd.x	fp1,fp5
+	Pixel	d0,d1
+	fmul.s	_d_zistepu,fp0
+	Pixel	d1,d0
+	fadd.x	fp0,fp2
+	fmove.x	fp4,fp3
+	Pixel	d0,d1
+	fdiv.x	fp2,fp3
+	Pixel	d1,d0
+	bra	.after
+
+;  next block the last: A, then the next span's start and divide
+.vspan
+	Pixel	d0,d1
+	fmove.x	fp3,fp0
+	Pixel	d1,d0
+	fmove.x	fp3,fp1
+	Pixel	d0,d1
+	fmul.x	fp6,fp0
+	Pixel	d1,d0
+	fmul.x	fp5,fp1
+	Pixel	d0,d1
+	fintrz.x	fp0
+	Pixel	d1,d0
+	fintrz.x	fp1
+	Pixel	d0,d1
+	fmove.l	fp0,v_sraw
+	Pixel	d1,d0
+	fmove.l	fp1,v_traw
+	Pixel	d0,d1
+	move.l	v_nextspan,a0
+	fmove.l	SPAN_U(a0),fp1
+	fmove.l	SPAN_V(a0),fp0
+	fmove.s	_d_sdivzstepv,fp2
+	Pixel	d1,d0
+	fmul.x	fp0,fp2
+	fadd.s	_d_sdivzorigin,fp2
+	fmove.s	_d_sdivzstepu,fp6
+	Pixel	d0,d1
+	fmul.x	fp1,fp6
+	fadd.x	fp2,fp6
+	fmove.s	_d_tdivzstepv,fp2
+	Pixel	d1,d0
+	fmul.x	fp0,fp2
+	fadd.s	_d_tdivzorigin,fp2
+	fmove.s	_d_tdivzstepu,fp5
+	fmul.x	fp1,fp5
+	Pixel	d0,d1
+	fadd.x	fp2,fp5
+	fmul.s	_d_zistepv,fp0
+	fadd.s	_d_ziorigin,fp0
+	Pixel	d1,d0
+	fmul.s	_d_zistepu,fp1
+	fadd.x	fp0,fp1
+	fmove.s	fp1,v_zitmp
+	Pixel	d0,d1
+	fmove.s	v_zitmp,fp2
+	fmove.x	fp4,fp3
+	fdiv.x	fp2,fp3
+	Pixel	d1,d0
+	bra	.after
+
+;  next block the last of the last span: A only
+.vend
+	Pixel	d0,d1
+	fmove.x	fp3,fp0
+	Pixel	d1,d0
+	fmove.x	fp3,fp1
+	Pixel	d0,d1
+	fmul.x	fp6,fp0
+	Pixel	d1,d0
+	fmul.x	fp5,fp1
+	Pixel	d0,d1
+	fintrz.x	fp0
+	Pixel	d1,d0
+	fintrz.x	fp1
+	Pixel	d0,d1
+	fmove.l	fp0,v_sraw
+	Pixel	d1,d0
+	fmove.l	fp1,v_traw
+	Pixel	d0,d1
+	Pixel	d1,d0
+	Pixel	d0,d1
+	Pixel	d1,d0
+	Pixel	d0,d1
+	Pixel	d1,d0
+	Pixel	d0,d1
+	Pixel	d1,d0
+	bra	.after
+
+.lastfirst
+	; a span of one block: the next span's start in line too (SpanFP, a2
+	; = the next span), with PixEnd between
+	LastSteps
+	moveq	#16,d0
+	sub.l	d6,d0
+	mulu.w	#PIXEL_SIZE,d0
+	lea	.pixels(pc,d0.l),a0
+	move.l	v_nextspan,d0
+	beq	.lastnofp
+	move.l	d0,a2
+	fmove.l	SPAN_U(a2),fp1
+	move.l	d2,d0
+	fmove.l	SPAN_V(a2),fp0
+	swap	d0
+	fmove.s	_d_sdivzstepv,fp2
+	ext.l	d0
+	fmul.x	fp0,fp2
+	move.l	d3,d1
+	fadd.s	_d_sdivzorigin,fp2
+	swap	d1
+	fmove.s	_d_sdivzstepu,fp6
+	ext.l	d1
+	fmul.x	fp1,fp6
+	muls.l	_cachewidth,d1
+	fadd.x	fp2,fp6
+	add.l	d1,d0
+	fmove.s	_d_tdivzstepv,fp2
+	swap	d2
+	fmul.x	fp0,fp2
+	clr.w	d2
+	fadd.s	_d_tdivzorigin,fp2
+	fmove.s	_d_tdivzstepu,fp5
+	swap	d3
+	fmul.x	fp1,fp5
+	clr.w	d3
+	fadd.x	fp2,fp5
+	move.l	d2,a4
+	fmul.s	_d_zistepv,fp0
+	move.l	d3,a6
+	fadd.s	_d_ziorigin,fp0
+	move.l	d4,d2
+	fmul.s	_d_zistepu,fp1
+	move.l	d5,d3
+	fadd.x	fp0,fp1
+	move.l	d0,d4
+	fmove.s	fp1,v_zitmp
+	move.l	_cachewidth,d5
+	fmove.s	v_zitmp,fp2
+	move.l	d7,d0
+	fmove.x	fp4,fp3
+	move.l	d7,d1
+	fdiv.x	fp2,fp3
+	jmp	(a0)
+.lastnofp
+	PixEnd
+	jmp	(a0)
+.lastlater
+	; the next span's start is in flight already (.vspan)
+	LastSteps
+.lastgo
+	; enter the unrolled loop at the copy that leaves n pixels
+	moveq	#16,d0
+	sub.l	d6,d0
+	mulu.w	#PIXEL_SIZE,d0
+	lea	.pixels(pc,d0.l),a0
+	PixEnd
+	jmp	(a0)
+
+	cnop	0,4
+.pixels
+	rept	8
+	Pixel	d0,d1
+	Pixel	d1,d0
+	endr
+
+	; the next span
+	move.l	v_nextspan,d0
+	move.l	d0,v_pspan
+	move.l	d0,a2
+	bne	.span
+
+	fmovem.x	(sp)+,fp2-fp7
+	movem.l	(sp)+,d2-d7/a2-a6
+	rts
+
 
 ;------------------------------------------------------------------------------
 ; void D_DrawZSpans (espan_t *pspan)
@@ -563,5 +1206,10 @@ v_tdivzn	ds.l	1			; float: d_tdivzstepu * N
 v_zin	ds.l	1				; float: d_zistepu * N
 v_tnext	ds.l	1				; t at the current block's far end
 v_pspan	ds.l	1				; the span being drawn
+v_nextspan	ds.l	1			; D_DrawSpans16: the span after it
+v_sraw	ds.l	1				; D_DrawSpans16: the next block's far-end s ...
+v_traw	ds.l	1				; ... and t, before the adjustment (A)
+v_lastn	ds.l	1				; D_DrawSpans16: a last block's count - 1
+v_zitmp	ds.l	1				; D_DrawSpans16: zi rounded to float
 
 	end

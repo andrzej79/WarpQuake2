@@ -485,6 +485,7 @@ extern  fixed16_t       bbextents, bbextentt;
 
 
 void D_DrawSpans16 (espan_t *pspans);
+void D_DrawSpans8 (espan_t *pspans);	// WarpQuake: sw_subdiv16 0
 void D_DrawZSpans (espan_t *pspans);
 void Turbulent8 (espan_t *pspan);
 void NonTurbulent8 (espan_t *pspan);	//PGM
@@ -553,6 +554,7 @@ extern cvar_t   *sw_draworder;
 extern cvar_t   *sw_maxedges;
 extern cvar_t   *sw_maxsurfs;
 extern cvar_t   *sw_mipcap;
+extern cvar_t   *sw_subdiv16;	// WarpQuake: perspective-correct every 16 pixels (1) or 8
 extern cvar_t   *sw_mipscale;
 extern cvar_t   *sw_mode;
 extern cvar_t   *sw_reportsurfout;

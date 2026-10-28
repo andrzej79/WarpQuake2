@@ -253,6 +253,7 @@ void R_Register (void)
 	sw_maxedges = ri.Cvar_Get ("sw_maxedges", STRINGER(MAXSTACKSURFACES), 0);
 	sw_maxsurfs = ri.Cvar_Get ("sw_maxsurfs", "0", 0);
 	sw_mipcap = ri.Cvar_Get ("sw_mipcap", "0", 0);
+	sw_subdiv16 = ri.Cvar_Get ("sw_subdiv16", "1", CVAR_ARCHIVE);
 	sw_mipscale = ri.Cvar_Get ("sw_mipscale", "1", 0);
 	sw_reportedgeout = ri.Cvar_Get ("sw_reportedgeout", "0", 0);
 	sw_reportsurfout = ri.Cvar_Get ("sw_reportsurfout", "0", 0);

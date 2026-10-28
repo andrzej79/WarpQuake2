@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define NUM_MIPS	4
 
 cvar_t	*sw_mipcap;
+cvar_t	*sw_subdiv16;	// WarpQuake: span perspective every 16 pixels (1) or 8
 cvar_t	*sw_mipscale;
 
 surfcache_t		*d_initial_rover;

@@ -963,7 +963,10 @@ void D_SkySurf (surf_t *s)
 
 	D_CalcGradients (pface);
 
-	D_DrawSpans16 (s->spans);
+	if (sw_subdiv16->value)
+		D_DrawSpans16 (s->spans);
+	else
+		D_DrawSpans8 (s->spans);
 
 // set up a gradient for the background surface that places it
 // effectively at infinity distance from the viewpoint
@@ -1040,7 +1043,10 @@ void D_SolidSurf (surf_t *s)
 
 	D_CalcGradients (pface);
 
-	D_DrawSpans16 (s->spans);
+	if (sw_subdiv16->value)
+		D_DrawSpans16 (s->spans);
+	else
+		D_DrawSpans8 (s->spans);
 
 	D_DrawZSpans (s->spans);
 
