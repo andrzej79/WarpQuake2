@@ -43,7 +43,10 @@ void R_MarkLights (dlight_t *light, int bit, mnode_t *node)
 	float		dist;
 	msurface_t	*surf;
 	int			i;
-	
+
+	// WarpQuake: the tail calls are this loop (vbcc made each a full call)
+	for (;;)
+	{
 	if (node->contents != -1)
 		return;
 
@@ -60,13 +63,13 @@ void R_MarkLights (dlight_t *light, int bit, mnode_t *node)
 
 	if (dist > i)	// PGM (dist > light->intensity)
 	{
-		R_MarkLights (light, bit, node->children[0]);
-		return;
+		node = node->children[0];
+		continue;
 	}
 	if (dist < -i)	// PGM (dist < -light->intensity)
 	{
-		R_MarkLights (light, bit, node->children[1]);
-		return;
+		node = node->children[1];
+		continue;
 	}
 		
 // mark the polygons
@@ -82,7 +85,8 @@ void R_MarkLights (dlight_t *light, int bit, mnode_t *node)
 	}
 
 	R_MarkLights (light, bit, node->children[0]);
-	R_MarkLights (light, bit, node->children[1]);
+	node = node->children[1];
+	}
 }
 
 
@@ -132,7 +136,12 @@ int RecursiveLightPoint (mnode_t *node, vec3_t start, vec3_t end)
 	int			maps;
 	float		samp;
 	int			r;
+	vec3_t		startbuf;
 
+	// WarpQuake: the tail calls are this loop - vbcc made every level of
+	// the descent a full call, saving 10 integer and 4 FPU registers
+	for (;;)
+	{
 	if (node->contents != -1)
 		return -1;		// didn't hit anything
 	
@@ -145,7 +154,10 @@ int RecursiveLightPoint (mnode_t *node, vec3_t start, vec3_t end)
 	side = front < 0;
 	
 	if ( (back < 0) == side)
-		return RecursiveLightPoint (node->children[side], start, end);
+	{
+		node = node->children[side];
+		continue;
+	}
 	
 	frac = front / (front-back);
 	mid[0] = start[0] + (end[0] - start[0])*frac;
@@ -213,7 +225,10 @@ int RecursiveLightPoint (mnode_t *node, vec3_t start, vec3_t end)
 	}
 
 // go down back side
-	return RecursiveLightPoint (node->children[!side], mid, end);
+	VectorCopy (mid, startbuf);
+	start = startbuf;
+	node = node->children[!side];
+	}
 }
 
 /*
