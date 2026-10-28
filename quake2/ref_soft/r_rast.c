@@ -584,6 +584,18 @@ void R_EmitCachedEdge (void)
 R_RenderFace
 ================
 */
+#if Q2_ASM
+// r_face060.s does the rest and comes here for translucent and sky surfaces;
+// it reads these at fixed offsets
+typedef char check_ms_texinfo[(offsetof (msurface_t, texinfo) == 52) ? 1 : -1];
+typedef char check_ms_firstedge[(offsetof (msurface_t, firstedge) == 20) ? 1 : -1];
+typedef char check_ti_flags[(offsetof (mtexinfo_t, flags) == 40) ? 1 : -1];
+typedef char check_model_edges[(offsetof (model_t, edges) == 176) ? 1 : -1];
+typedef char check_model_surfedges[(offsetof (model_t, surfedges) == 212) ? 1 : -1];
+typedef char check_sf_msurf[(offsetof (surf_t, msurf) == 28) ? 1 : -1];
+typedef char check_surf_skip[((SURF_SKY | SURF_TRANS33 | SURF_TRANS66) == 0x34) ? 1 : -1];
+#define R_RenderFace R_RenderFaceC
+#endif
 void R_RenderFace (msurface_t *fa, int clipflags)
 {
 	int			i, lindex;
@@ -790,6 +802,9 @@ void R_RenderFace (msurface_t *fa, int clipflags)
 
 	surface_p++;
 }
+#if Q2_ASM
+#undef R_RenderFace
+#endif
 
 
 /*
