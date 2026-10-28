@@ -608,6 +608,16 @@ void R_DrawParticles (void)
 	__asm fldcw word ptr [fpu_sp24_cw]
 #endif
 
+#if Q2_ASM
+	{
+		// r_part060.s: the loop below with R_DrawParticle inline; it reads
+		// vid.alphamap at a fixed offset
+		extern void R_DrawParticleList (particle_t *p, int n);
+		typedef char check_alphamap[(offsetof (viddef_t, alphamap) == 8) ? 1 : -1];
+
+		R_DrawParticleList (r_newrefdef.particles, r_newrefdef.num_particles);
+	}
+#else
 	for (p=r_newrefdef.particles, i=0 ; i<r_newrefdef.num_particles ; i++,p++)
 	{
 
@@ -630,6 +640,7 @@ void R_DrawParticles (void)
 
 		R_DrawParticle();
 	}
+#endif
 	Q2C_ADD (Q2C_PARTICLES, r_newrefdef.num_particles);
 
 #if id386 && !defined __linux__
