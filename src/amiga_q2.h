@@ -2,7 +2,7 @@
 //
 // The files that include the AmigaOS headers (amiga_os.c, amiga_screen.c,
 // amiga_input.c) and the ones that include the engine's (sys_amiga.c,
-// vid_amiga.c, in_amiga.c, net_loop.c) never include each other's: the two
+// vid_amiga.c, in_amiga.c, net_udp.c) never include each other's: the two
 // define clashing names (TRUE/true, BYTE/byte, MENUUP, ...).  They meet only
 // here, in plain C types.
 #ifndef AMIGA_Q2_H
@@ -68,6 +68,19 @@ void *qaSoundInit(unsigned long mode, int freq, int *frames, int *rate, int *cha
 int qaSoundPos(void);                  // the frame AHI is playing
 const char *qaSoundInfo(void);
 void qaSoundShutdown(void);            // also the atexit() cleanup: safe to call twice
+
+// ---- amiga_net.c: UDP on bsdsocket.library ----
+
+// An IPv4 address is 4 bytes in network order, a port a number (host order).
+int qaNetStart(void);                  // opens the TCP/IP stack: 0 if there is none
+const char *qaNetInfo(void);           // which one, once started
+void qaNetStop(void);                  // closes it and every socket; also the atexit() cleanup
+int qaNetOpen(int port);               // a non-blocking UDP socket on port (-1 any): -1 failed
+void qaNetClose(int s);
+int qaNetSend(int s, const unsigned char ip[4], int port, const void *data, int len);
+int qaNetRecv(int s, unsigned char ip[4], int *port, void *buf, int max);  // -1: nothing
+int qaNetResolve(const char *name, unsigned char ip[4]);                   // 0: unknown
+void qaNetWait(int s, int msec);       // until a packet arrives or msec pass
 
 // ---- amiga_input.c: the game window's input ----
 

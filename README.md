@@ -89,8 +89,8 @@ make ftp            # upload to WORK:Games/WarpQuake2 (AMIGA_FTP_HOST/USER/PASSW
 
 vbcc, `-cpu=68060 -fpu=68060 -O1` with `-lm060`, as WarpQuake (vbcc 0.9h miscompiles some loops
 at -O2), and vasm. It needs vbcc and vasm on the PATH, the AmigaOS 3.2 NDK (`NDK_INC_C`), the
-Picasso96 developer headers (`P96_SDK`) and AHI's (`AHI_SDK`, the ahidev archive), all
-overridable on the `make` command line.
+Picasso96 developer headers (`P96_SDK`), AHI's (`AHI_SDK`, the ahidev archive) and Roadshow's
+network headers (`NET_INC`, in the NDK), all overridable on the `make` command line.
 
 ## Running
 
@@ -155,6 +155,16 @@ into the wrong code. The name table, `game/g_savetab.c`, is generated from the g
 by `tools/gen_savetab.py` - run it after adding or renaming a game function or monster move
 (`--check` says whether it is current). Saves from before this format are refused with a
 message.
+
+**Multiplayer** is id's, over UDP on `bsdsocket.library` (Roadshow, or any TCP/IP stack
+that provides the library). The stack is opened only when a game goes multiplayer: Multiplayer,
+Start Network Server (or `maxclients` above 1, e.g. `+set maxclients 4 +set deathmatch 1 +map
+q2dm1`), or `connect <address>` to another machine; single player never needs it. The server
+listens on UDP port 27910 (`port`), the client on 27901 (`clientport`, or any free port).
+Addresses are IPv4, dotted or a host name, with an optional `:port`. The other side can be any
+Quake II 3.19/3.20 compatible game, protocol 34: an Amiga, or a PC running id's 3.20 or a port
+that speaks its protocol. Join Network Server's server list asks by broadcast, so it finds
+servers on the local network only; others are joined with `connect`.
 
 A timedemo (in the console: `timedemo 1`, then `demomap demo1.dm2`):
 
@@ -222,8 +232,8 @@ Engine bugs fixed on the way: an instant particle's time was read uninitialised
   `quake2/ref_soft/*060.s` are the 68060 routines; `Q2_ASM` (the Makefile's `ASM`) chooses
   them over the C.
 - `src/` - the AmigaOS platform layer. `amiga_os.c`, `amiga_screen.c`, `amiga_input.c`,
-  `amiga_ahi.c` and `q2sample.c` include the OS headers; `sys_amiga.c`, `vid_amiga.c`,
-  `swimp_amiga.c`, `snddma_amiga.c`, `in_amiga.c`, `net_loop.c` and `q2prof.c` include the
+  `amiga_ahi.c`, `amiga_net.c` and `q2sample.c` include the OS headers; `sys_amiga.c`, `vid_amiga.c`,
+  `swimp_amiga.c`, `snddma_amiga.c`, `in_amiga.c`, `net_udp.c` and `q2prof.c` include the
   engine's. They meet only in
   `amiga_q2.h` and `q2prof.h`.
 - `tools/` - uploads, downloads, the benchmark and CRC drivers, the profile readers.

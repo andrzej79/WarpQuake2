@@ -132,6 +132,7 @@ void qaShutdown(void)
   wprofStop();
   wprofFree();
   qaInputStop();
+  qaNetStop();
   qaSoundShutdown();
   qaScreenShutdown();
   qaFindClose();

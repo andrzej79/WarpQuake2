@@ -38,6 +38,8 @@ P96_SDK     ?= ../csWarpAmigaSoftware/p96_gfx_driver/Picasso96Develop/Include
 # src/amiga_ahi.c; vbcc has the proto/inline stubs.  The default is where
 # they sit when this repo is checked out next to csWarpAmigaSoftware.
 AHI_SDK     ?= ../csWarpAmigaSoftware/warpAHIDriver/ahidev_4.18/AHI/Developer/include/C
+# Roadshow's network headers (bsdsocket.library), for src/amiga_net.c.
+NET_INC     ?= $(SDK_DIR)/NDK3.2R4/SANA+RoadshowTCP-IP/netinclude
 # AMIGA: the few engine changes that are AmigaOS-specific (the base directory).
 DEF_FLAGS   := -DAMIGA -DGAME_HARD_LINKED -DREF_HARD_LINKED -DQ2_ASM=$(ASM) $(addprefix -D,$(DEFINES))
 
@@ -86,6 +88,11 @@ $(BIN): $(OBJS)
 $(OBJ_DIR)/src/%.o: src/%.c $(wildcard src/*.h) $(ENGINE_HDRS)
 	@$(MKDIR) $(@D)
 	$(CC) $(CFLAGS) -Isrc -I$(NDK_INC_C) -I$(P96_SDK) -I$(AHI_SDK) $(DEF_FLAGS) -c $< -o $@
+
+# The TCP/IP stack's headers (Roadshow's, in the NDK) only for the socket code.
+$(OBJ_DIR)/src/amiga_net.o: src/amiga_net.c src/amiga_q2.h
+	@$(MKDIR) $(@D)
+	$(CC) $(CFLAGS) -Isrc -I$(NDK_INC_C) -I$(NET_INC) $(DEF_FLAGS) -c $< -o $@
 
 # Engine objects quietly, the log printed only on failure.
 $(OBJ_DIR)/quake2/%.o: quake2/%.c $(ENGINE_HDRS) $(wildcard src/q2prof.h src/amiga_q2.h)
