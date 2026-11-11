@@ -164,6 +164,13 @@ void CMod_LoadSubmodels (lump_t *l)
 		}
 		out->headnode = LittleLong (in->headnode);
 	}
+
+	// The entries past this map's still held the previous map's submodels,
+	// whose headnodes index past this map's nodes; a reference left over from
+	// that map (a client or server entity during the change) walked the
+	// previous map's stale nodes (the per-map arrays of the ARM and PPC builds
+	// took it into the heap behind map_nodes and crashed).
+	memset (&map_cmodels[count], 0, (MAX_MAP_MODELS - count) * sizeof(map_cmodels[0]));
 }
 
 
@@ -797,6 +804,25 @@ CM_PointLeafnum_r
 
 ==================
 */
+/*
+==================
+CM_BadHeadnode
+
+A headnode outside the map loaded now (a node past its own and the box hull's
+six, or a leaf past its leafs): one cached from the previous map.  The walks
+behind these entry points would read the previous map's stale nodes (past the
+arrays, in the ARM and PPC builds, which size them to the map), so the callers
+treat it as empty space.
+==================
+*/
+static qboolean CM_BadHeadnode (int headnode)
+{
+	if (headnode < numnodes + 6 && headnode >= -numleafs)
+		return false;
+	Com_DPrintf ("CM: headnode %d outside the map (%d nodes, %d leafs)\n", headnode, numnodes, numleafs);
+	return true;
+}
+
 int CM_PointLeafnum_r (vec3_t p, int num)
 {
 	float		d;
@@ -892,7 +918,8 @@ int	CM_BoxLeafnums_headnode (vec3_t mins, vec3_t maxs, int *list, int listsize, 
 
 	leaf_topnode = -1;
 
-	CM_BoxLeafnums_r (headnode);
+	if (!CM_BadHeadnode (headnode))
+		CM_BoxLeafnums_r (headnode);
 
 	if (topnode)
 		*topnode = leaf_topnode;
@@ -918,7 +945,7 @@ int CM_PointContents (vec3_t p, int headnode)
 {
 	int		l;
 
-	if (!numnodes)	// map not loaded
+	if (!numnodes || CM_BadHeadnode (headnode))	// map not loaded
 		return 0;
 
 	l = CM_PointLeafnum_r (p, headnode);
@@ -956,6 +983,8 @@ int	CM_TransformedPointContents (vec3_t p, int headnode, vec3_t origin, vec3_t a
 		p_l[2] = DotProduct (temp, up);
 	}
 
+	if (!numnodes || CM_BadHeadnode (headnode))
+		return 0;
 	l = CM_PointLeafnum_r (p_l, headnode);
 
 	return map_leafs[l].contents;
@@ -1362,7 +1391,7 @@ trace_t		CM_BoxTrace (vec3_t start, vec3_t end,
 	trace_trace.fraction = 1;
 	trace_trace.surface = &(nullsurface.c);
 
-	if (!numnodes)	// map not loaded
+	if (!numnodes || CM_BadHeadnode (headnode))	// map not loaded
 		return trace_trace;
 
 	trace_contents = brushmask;
@@ -1763,6 +1792,8 @@ qboolean CM_HeadnodeVisible (int nodenum, byte *visbits)
 	if (nodenum < 0)
 	{
 		leafnum = -1-nodenum;
+		if (leafnum >= numleafs)	// cached from the previous map (CM_BadHeadnode)
+			return false;
 		cluster = map_leafs[leafnum].cluster;
 		if (cluster == -1)
 			return false;
@@ -1771,6 +1802,8 @@ qboolean CM_HeadnodeVisible (int nodenum, byte *visbits)
 		return false;
 	}
 
+	if (nodenum >= numnodes + 6)	// cached from the previous map (CM_BadHeadnode)
+		return false;
 	node = &map_nodes[nodenum];
 	if (CM_HeadnodeVisible(node->children[0], visbits))
 		return true;
